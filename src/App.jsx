@@ -316,14 +316,61 @@ const Phase1 = ({ d, u }) => {
         </div>
       </Field>
       <Divider label="Key Dates" />
-      <Row>
-        <Field label="Target Opening Date" required hint="Go-live target — everything is scoped to this.">
-          <Input type="date" value={d.openingDate||''} onChange={v=>u('openingDate',v)} />
+      {d.practiceType==='new' ? (
+        <Row>
+          <Field label="Target Opening Date" required hint="Go-live target — everything is scoped to this.">
+            <Input type="date" value={d.openingDate||''} onChange={v=>u('openingDate',v)} />
+          </Field>
+          <Field label="Fitout Completion (estimated)">
+            <Input type="date" value={d.fitoutDate||''} onChange={v=>u('fitoutDate',v)} />
+          </Field>
+        </Row>
+      ) : (
+        <Field label="Go-Live Date" required hint="The date 32 Byte takes over support and management.">
+          <Input type="date" value={d.goLiveDate||''} onChange={v=>u('goLiveDate',v)} />
         </Field>
-        <Field label="Fitout Completion (estimated)">
-          <Input type="date" value={d.fitoutDate||''} onChange={v=>u('fitoutDate',v)} />
-        </Field>
-      </Row>
+      )}
+      {d.practiceType==='existing' && (
+        <>
+          <Divider label="Existing IT Provider" />
+          <Toggle checked={!!d.existingIT} onChange={v=>u('existingIT',v)} label="Practice has an existing IT provider" />
+          {d.existingIT && (
+            <div style={{ marginTop:16 }}>
+              <Row>
+                <Field label="Company Name" tight><Input value={d.existingITCompany||''} onChange={v=>u('existingITCompany',v)} placeholder="IT company name" /></Field>
+                <Field label="Contract Type" tight>
+                  <Select value={d.existingITType||''} onChange={v=>u('existingITType',v)}
+                    options={['Managed Service Agreement (MSA)','Break Fix','Ad Hoc','Retainer','Other']} placeholder="Select type…" />
+                </Field>
+              </Row>
+              <Row cols={3}>
+                <Field label="Contact Name" tight><Input value={d.existingITContact||''} onChange={v=>u('existingITContact',v)} placeholder="Name" /></Field>
+                <Field label="Phone" tight><Input value={d.existingITPhone||''} onChange={v=>u('existingITPhone',v)} placeholder="Phone number" /></Field>
+                <Field label="Email" tight><Input type="email" value={d.existingITEmail||''} onChange={v=>u('existingITEmail',v)} placeholder="email@company.com" /></Field>
+              </Row>
+              <Field label="Contract Expiry" tight>
+                <Input type="date" value={d.existingITExpiry||''} onChange={v=>u('existingITExpiry',v)} />
+              </Field>
+              <Field label="What does the current provider manage?" hint="Select all that apply">
+                <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:4 }}>
+                  {[
+                    {k:'existingITManagesDevices',  l:'Devices (computers, servers)'},
+                    {k:'existingITManagesEmail',     l:'Email (Microsoft 365 / Google)'},
+                    {k:'existingITManagesPhones',    l:'Phone system'},
+                    {k:'existingITManagesInternet',  l:'Internet / NBN'},
+                    {k:'existingITManagesSecurity',  l:'Security (AV, patching, monitoring)'},
+                  ].map(({k,l})=>(
+                    <Toggle key={k} checked={!!d[k]} onChange={v=>u(k,v)} label={l} />
+                  ))}
+                </div>
+              </Field>
+              <Field label="Notes" tight>
+                <Textarea value={d.existingITNotes||''} onChange={v=>u('existingITNotes',v)} placeholder="Access details, systems in use, known issues, handover requirements…" />
+              </Field>
+            </div>
+          )}
+        </>
+      )}
       <Divider label="Finance" />
       <Field label="Practice Finance Provider">
         <Select value={d.financeProvider||''} onChange={v=>u('financeProvider',v)} options={FINANCE_OPTS} placeholder="Select provider (if applicable)…" />
@@ -515,71 +562,98 @@ const Phase3 = ({ d, u }) => {
       <Divider label="Imaging Equipment & Database Requirements" />
       <InfoBox>Capture every imaging device — this determines database requirements, computer specs and vendor coordination.</InfoBox>
 
-      {/* Intraoral Scanner */}
-      <Card>
-        <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary, marginBottom:12 }}>Intraoral Scanner</div>
-        <Toggle checked={!!d.hasIntraoral} onChange={v=>u('hasIntraoral',v)} label="Intraoral scanner required / planned" />
-        {d.hasIntraoral&&(
-          <div style={{ marginTop:14 }}>
+      {/* Intraoral Scanners — repeatable */}
+      <div style={{ marginBottom:10 }}>
+        <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary, marginBottom:10 }}>Intraoral Scanners</div>
+        {(d.intraoralScanners||[]).length===0 && (
+          <div style={{ color:C.textMuted, fontSize:13, marginBottom:10 }}>No intraoral scanners added.</div>
+        )}
+        {(d.intraoralScanners||[]).map((sc,i)=>(
+          <Card key={sc.id} style={{ marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <span style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary }}>Scanner {i+1}{sc.model?` — ${sc.model}`:''}</span>
+              <button onClick={()=>u('intraoralScanners',(d.intraoralScanners||[]).filter(x=>x.id!==sc.id))} style={{ fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
+            </div>
             <Row>
-              <Field label="Brand / Model" tight><Input value={d.intraoralModel||''} onChange={v=>u('intraoralModel',v)} placeholder="e.g. Trios 5, iTero Element, Primescan" /></Field>
-              <Field label="Software" tight><Input value={d.intraoralSoftware||''} onChange={v=>u('intraoralSoftware',v)} placeholder="e.g. 3Shape Communicate, OrthoAnalyzer" /></Field>
+              <Field label="Brand / Model" tight><Input value={sc.model||''} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,model:v}:x))} placeholder="e.g. Trios 5, iTero Element, Primescan" /></Field>
+              <Field label="Software" tight><Input value={sc.software||''} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,software:v}:x))} placeholder="e.g. 3Shape Communicate, OrthoAnalyzer" /></Field>
             </Row>
             <Row>
-              <Field label="Dedicated Workstation Required" tight>
-                <Toggle checked={!!d.intraoralDedicated} onChange={v=>u('intraoralDedicated',v)} label={d.intraoralDedicated?'Yes — needs dedicated PC':'Connects to existing workstation'} />
+              <Field label="Dedicated Workstation" tight>
+                <Toggle checked={!!sc.dedicated} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,dedicated:v}:x))} label={sc.dedicated?'Yes — needs dedicated PC':'Uses existing workstation'} />
               </Field>
               <Field label="Local Database" tight>
-                <Toggle checked={!!d.intraoralDatabase} onChange={v=>u('intraoralDatabase',v)} label={d.intraoralDatabase?'Yes — local database storage':'Cloud / no local storage'} />
+                <Toggle checked={!!sc.database} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,database:v}:x))} label={sc.database?'Yes — local database storage':'Cloud / no local storage'} />
               </Field>
             </Row>
-            <Field label="Notes" tight><Input value={d.intraoralNotes||''} onChange={v=>u('intraoralNotes',v)} placeholder="Trolley-based, chair-side, WiFi requirements…" /></Field>
-          </div>
-        )}
-      </Card>
+            <Field label="Notes" tight><Input value={sc.notes||''} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,notes:v}:x))} placeholder="Trolley-based, chair-side, WiFi requirements…" /></Field>
+          </Card>
+        ))}
+        <button onClick={()=>u('intraoralScanners',[...(d.intraoralScanners||[]),newScanner()])}
+          style={{ width:'100%', padding:'9px', borderRadius:9, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:13, cursor:'pointer', marginBottom:16 }}>
+          + Add Intraoral Scanner
+        </button>
+      </div>
 
-      {/* X-ray / OPG / CBCT */}
-      <Card>
-        <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary, marginBottom:12 }}>X-ray / OPG / CBCT</div>
-        <Toggle checked={!!d.hasXray} onChange={v=>u('hasXray',v)} label="X-ray / OPG / CBCT required / planned" />
-        {d.hasXray&&(
-          <div style={{ marginTop:14 }}>
+      {/* X-ray / OPG / CBCT — repeatable */}
+      <div style={{ marginBottom:10 }}>
+        <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary, marginBottom:10 }}>X-ray / OPG / CBCT Machines</div>
+        {(d.xrayMachines||[]).length===0 && (
+          <div style={{ color:C.textMuted, fontSize:13, marginBottom:10 }}>No X-ray / imaging machines added.</div>
+        )}
+        {(d.xrayMachines||[]).map((xr,i)=>(
+          <Card key={xr.id} style={{ marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <span style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary }}>Machine {i+1}{xr.model?` — ${xr.model}`:''}{xr.type?` (${xr.type})`:''}</span>
+              <button onClick={()=>u('xrayMachines',(d.xrayMachines||[]).filter(x=>x.id!==xr.id))} style={{ fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
+            </div>
             <Row>
-              <Field label="Machine Brand / Model" tight><Input value={d.xrayModel||''} onChange={v=>u('xrayModel',v)} placeholder="e.g. Dürr VistaScan, Acteon Pspix2, Planmeca" /></Field>
+              <Field label="Brand / Model" tight><Input value={xr.model||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,model:v}:x))} placeholder="e.g. Dürr VistaScan, Acteon Pspix2, Planmeca" /></Field>
               <Field label="Type" tight>
-                <Select value={d.xrayType||''} onChange={v=>u('xrayType',v)} options={['Intraoral X-ray sensor','OPG (panoramic)','CBCT','OPG + CBCT combined','Other']} placeholder="Select type…" />
+                <Select value={xr.type||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,type:v}:x))} options={['Intraoral X-ray sensor','OPG (panoramic)','CBCT','OPG + CBCT combined','Other']} placeholder="Select type…" />
               </Field>
             </Row>
             <Row>
-              <Field label="Imaging Software" tight><Input value={d.xraySoftware||''} onChange={v=>u('xraySoftware',v)} placeholder="e.g. Vistasoft, Sidexis, Romexis" /></Field>
+              <Field label="Imaging Software" tight><Input value={xr.software||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,software:v}:x))} placeholder="e.g. Vistasoft, Sidexis, Romexis" /></Field>
               <Field label="Timing" tight>
-                <Select value={d.xrayTiming||''} onChange={v=>u('xrayTiming',v)} options={['Day one (opening)','Within 6 months','6–12 months','Future — not yet confirmed']} placeholder="When is this going in?" />
+                <Select value={xr.timing||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,timing:v}:x))} options={['Day one (opening)','Within 6 months','6–12 months','Future — not yet confirmed']} placeholder="When is this going in?" />
               </Field>
             </Row>
             <Row>
-              <Field label="Dedicated Acquisition Workstation" tight>
-                <Toggle checked={!!d.xrayDedicated} onChange={v=>u('xrayDedicated',v)} label={d.xrayDedicated?'Yes — dedicated acquisition PC':'Uses existing workstation'} />
+              <Field label="Dedicated Workstation" tight>
+                <Toggle checked={!!xr.dedicated} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,dedicated:v}:x))} label={xr.dedicated?'Yes — dedicated acquisition PC':'Uses existing workstation'} />
               </Field>
-              <Field label="Local Database / RAID Required" tight>
-                <Toggle checked={!!d.xrayDatabase} onChange={v=>u('xrayDatabase',v)} label={d.xrayDatabase?'Yes — RAID array required':'No local database'} />
+              <Field label="RAID / Local Database" tight>
+                <Toggle checked={!!xr.database} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,database:v}:x))} label={xr.database?'Yes — RAID array required':'No local database'} />
               </Field>
             </Row>
-            <Field label="Notes" tight><Input value={d.xrayNotes||''} onChange={v=>u('xrayNotes',v)} placeholder="Lead lining, room setup, vendor install coordination…" /></Field>
-          </div>
-        )}
-      </Card>
+            <Field label="Notes" tight><Input value={xr.notes||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,notes:v}:x))} placeholder="Lead lining, room setup, vendor install coordination…" /></Field>
+          </Card>
+        ))}
+        <button onClick={()=>u('xrayMachines',[...(d.xrayMachines||[]),newXray()])}
+          style={{ width:'100%', padding:'9px', borderRadius:9, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:13, cursor:'pointer', marginBottom:16 }}>
+          + Add X-ray / OPG / CBCT Machine
+        </button>
+      </div>
 
-      {/* Other Imaging */}
-      <Card>
-        <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary, marginBottom:12 }}>Other Imaging / Clinical Equipment</div>
-        <Toggle checked={!!d.hasOtherImaging} onChange={v=>u('hasOtherImaging',v)} label="Other imaging or connected clinical equipment" />
-        {d.hasOtherImaging&&(
-          <div style={{ marginTop:14 }}>
-            <Field label="Equipment Description" tight><Input value={d.otherImagingDesc||''} onChange={v=>u('otherImagingDesc',v)} placeholder="e.g. CEREC, face scanner, caries detection device…" /></Field>
-            <Field label="Database / Storage Requirements" tight><Textarea rows={2} value={d.otherImagingNotes||''} onChange={v=>u('otherImagingNotes',v)} placeholder="Any specific storage, network or computer requirements…" /></Field>
-          </div>
-        )}
-      </Card>
+      {/* Other Imaging — repeatable */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary, marginBottom:10 }}>Other Imaging / Clinical Equipment</div>
+        {(d.otherImaging||[]).map((oi,i)=>(
+          <Card key={oi.id} style={{ marginBottom:10 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <span style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary }}>Device {i+1}{oi.desc?` — ${oi.desc}`:''}</span>
+              <button onClick={()=>u('otherImaging',(d.otherImaging||[]).filter(x=>x.id!==oi.id))} style={{ fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
+            </div>
+            <Field label="Equipment Description" tight><Input value={oi.desc||''} onChange={v=>u('otherImaging',(d.otherImaging||[]).map(x=>x.id===oi.id?{...x,desc:v}:x))} placeholder="e.g. CEREC, face scanner, caries detection device…" /></Field>
+            <Field label="Database / Storage Requirements" tight><Textarea rows={2} value={oi.notes||''} onChange={v=>u('otherImaging',(d.otherImaging||[]).map(x=>x.id===oi.id?{...x,notes:v}:x))} placeholder="Any specific storage, network or computer requirements…" /></Field>
+          </Card>
+        ))}
+        <button onClick={()=>u('otherImaging',[...(d.otherImaging||[]),newOtherImg()])}
+          style={{ width:'100%', padding:'9px', borderRadius:9, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:13, cursor:'pointer' }}>
+          + Add Other Imaging / Clinical Equipment
+        </button>
+      </div>
 
       {/* Networking */}
       <Divider label="Networking" />
@@ -598,6 +672,23 @@ const Phase3 = ({ d, u }) => {
             return <button key={o} onClick={()=>u('apMount',o)} style={{ flex:1, padding:'9px 8px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o}</button>;
           })}
         </div>
+      </Field>
+      <Field label="Floor Plan / WiFi Design" hint="Upload a floor plan image for reference during AP placement discussions.">
+        <div style={{ marginBottom:8 }}>
+          <label style={{ display:'inline-block', padding:'9px 18px', borderRadius:8, border:`2px dashed ${C.border}`, background:C.surfaceHi, color:C.orange, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+            📎 Upload Floor Plan
+            <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{
+              const f=e.target.files[0]; if(!f) return;
+              const r=new FileReader(); r.onload=ev=>u('floorPlanImage',ev.target.result); r.readAsDataURL(f);
+            }} />
+          </label>
+          {d.floorPlanImage && <button onClick={()=>u('floorPlanImage',null)} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
+        </div>
+        {d.floorPlanImage && (
+          <div style={{ borderRadius:10, overflow:'hidden', border:`1.5px solid ${C.border}`, maxHeight:400 }}>
+            <img src={d.floorPlanImage} alt="Floor plan" style={{ width:'100%', display:'block', objectFit:'contain' }} />
+          </div>
+        )}
       </Field>
 
       {/* Security Cameras */}
@@ -814,6 +905,15 @@ const Phase5 = ({ d, u, rooms }) => {
       <Divider label="Additional" />
       <Field label="Additional Practice Sites / Locations">
         <Num value={d.additionalSites||''} onChange={v=>u('additionalSites',v)} />
+      </Field>
+      <Divider label="Cyber Liability Insurance" />
+      <InfoBox>Capture the practice's existing cyber insurance details — important context for our Advanced Cyber Security recommendations.</InfoBox>
+      <Row>
+        <Field label="Insurer / Provider"><Input value={d.cyberInsurer||''} onChange={v=>u('cyberInsurer',v)} placeholder="e.g. AXA, Chubb, Emergence" /></Field>
+        <Field label="Policy Number"><Input value={d.cyberPolicyNumber||''} onChange={v=>u('cyberPolicyNumber',v)} placeholder="Policy number" /></Field>
+      </Row>
+      <Field label="Policy Expiry">
+        <Input type="date" value={d.cyberExpiry||''} onChange={v=>u('cyberExpiry',v)} />
       </Field>
       <Field label="Managed Services Notes" tight>
         <Textarea value={d.msaNotes||''} onChange={v=>u('msaNotes',v)} placeholder="Special requirements, existing contracts, additional context…" />
@@ -1046,8 +1146,11 @@ Return only the email text, no subject line, no preamble.`;
 };
 
 const Phase6 = ({ d, u, locked, onLock, rooms }) => {
-  const [showKqm,  setShowKqm]  = useState(false);
-  const [showEmail,setShowEmail] = useState(false);
+  const [showKqm,      setShowKqm]      = useState(false);
+  const [showEmail,    setShowEmail]    = useState(false);
+  const [showInternal, setShowInternal] = useState(false);
+  const [internalSent, setInternalSent] = useState(false);
+  const [internalSending, setInternalSending] = useState(false);
   const autoEP = (rooms||[]).reduce((a,r)=>a+n(r.qty),0);
   const endpoints = n(d.endpoints)||autoEP;
   const psHrs = n(d.installHours)||(rooms.reduce((a,r)=>a+n(r.qty),0)*2.5);
@@ -1059,6 +1162,124 @@ const Phase6 = ({ d, u, locked, onLock, rooms }) => {
   return (
     <div>
       {showEmail&&<EmailModal d={d} rooms={rooms} onClose={()=>setShowEmail(false)} />}
+
+      {/* Internal Summary Modal */}
+      {showInternal&&(
+        <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100, padding:20 }}>
+          <div style={{ background:C.surface, borderRadius:16, width:'100%', maxWidth:680, maxHeight:'88vh', overflow:'hidden', display:'flex', flexDirection:'column', boxShadow:'0 25px 60px rgba(0,0,0,.3)' }}>
+            <div style={{ padding:'20px 24px', borderBottom:`1px solid ${C.border}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div>
+                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:18, color:C.textPrimary }}>Internal Team Summary</div>
+                <div style={{ fontSize:13, color:C.textSecondary, marginTop:2 }}>Send a full project brief to the 32 Byte team</div>
+              </div>
+              <button onClick={()=>setShowInternal(false)} style={{ background:'none', border:'none', fontSize:20, color:C.textMuted, cursor:'pointer' }}>✕</button>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'20px 24px' }}>
+              <Field label="Send to (team email address)">
+                <Input type="email" value={d.internalTeamEmail||''} onChange={v=>u('internalTeamEmail',v)} placeholder="team@32byte.com.au" />
+              </Field>
+              {/* Copyable internal summary */}
+              <div style={{ background:C.surfaceHi, borderRadius:10, padding:'16px 18px', fontSize:13, color:C.textPrimary, lineHeight:1.8, whiteSpace:'pre-wrap', marginBottom:16, maxHeight:400, overflowY:'auto' }}>
+{`PRACTICE SUCCESS BLUEPRINT — INTERNAL BRIEF
+${'═'.repeat(50)}
+Practice: ${d.practiceName||'—'} | ${[d.suburb, d.state].filter(Boolean).join(', ')||'—'}
+${d.practiceType==='new'?`Opening: ${d.openingDate||'TBD'} | Fitout: ${d.fitoutDate||'TBD'}`:`Go-Live: ${d.goLiveDate||'TBD'}`}
+PMS: ${d.pms||'—'} | Imaging SW: ${(d.imagingSw||[]).join(', ')||'—'}
+Sales Rep: ${d.salesRep||'—'} | Meeting: ${d.meetingDate||'—'}
+Contact: ${d.contactName||'—'} | ${d.contactEmail||'—'}
+${d.financeProvider?`Finance: ${d.financeProvider}`:''}
+
+${d.practiceType==='existing'&&d.existingIT?`EXISTING IT PROVIDER
+${'─'.repeat(40)}
+Company: ${d.existingITCompany||'—'} | Type: ${d.existingITType||'—'}
+Contact: ${d.existingITContact||'—'} | ${d.existingITPhone||'—'} | ${d.existingITEmail||'—'}
+Contract Expiry: ${d.existingITExpiry||'—'}
+Currently manages: ${[d.existingITManagesDevices&&'Devices',d.existingITManagesEmail&&'Email',d.existingITManagesPhones&&'Phones',d.existingITManagesInternet&&'Internet',d.existingITManagesSecurity&&'Security'].filter(Boolean).join(', ')||'—'}
+${d.existingITNotes?`Notes: ${d.existingITNotes}`:''}
+`:''}
+SOLUTIONS IN SCOPE
+${'─'.repeat(40)}
+${[d.q1req!==false&&`✅ Solution 1 — Hardware & Infrastructure${d.q1url?'\n   '+d.q1url:''}`,d.q2req!==false&&`✅ Solution 2 — Telecommunications${d.q2url?'\n   '+d.q2url:''}`,d.q3req!==false&&`✅ Solution 3 — Managed Services${d.q3url?'\n   '+d.q3url:''}`].filter(Boolean).join('\n')||'None selected'}
+
+IT INFRASTRUCTURE
+${'─'.repeat(40)}
+${rooms.map(r=>{const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];return`${r.name||'Room'}: ${dev.label} × ${n(r.qty)}${r.database?' [RAID]':''}${r.monitor&&r.monitor!=='No Monitor'?' · '+r.monitor:''}`;}).join('\n')||'No rooms configured'}
+Switch: ${d.switchType||'—'} | APs: ${d.wifiAPs||'0'}× UniFi U7 Pro (${d.apMount||'TBC'})
+${d.cameras?`Cameras: ${d.cameraCount||'?'}× UniFi G5 · ${d.nvrStorage||'NVR TBC'}`:''}
+${d.firewall?'Firewall: UDM Pro':''}  ${d.failover?'4G Failover: Teltonika TRB140':''}
+M365: ${[d.m365Premium&&`${d.m365Premium}× Business Premium`,d.m365F1&&`${d.m365F1}× F1`].filter(Boolean).join(', ')||'—'}
+
+IMAGING EQUIPMENT
+${'─'.repeat(40)}
+${(d.intraoralScanners||[]).map((s,i)=>`Intraoral ${i+1}: ${s.model||'TBC'} | SW: ${s.software||'—'}${s.dedicated?' [dedicated PC]':''}${s.database?' [RAID]':''}`).join('\n')||'No intraoral scanners'}
+${(d.xrayMachines||[]).map((x,i)=>`X-ray ${i+1}: ${x.model||'TBC'} (${x.type||'type TBC'}) | SW: ${x.software||'—'} | Timing: ${x.timing||'—'}${x.dedicated?' [dedicated PC]':''}${x.database?' [RAID]':''}`).join('\n')||'No X-ray / imaging machines'}
+${(d.otherImaging||[]).map((o,i)=>`Other ${i+1}: ${o.desc||'TBC'} | ${o.notes||'—'}`).join('\n')||''}
+
+EXTERNAL VENDORS
+${'─'.repeat(40)}
+${(d.vendors||[]).map(v=>`${v.type||'Vendor'}: ${v.company||'—'} | ${v.contact||'—'} | ${v.phone||'—'} | ${v.email||'—'} | Install: ${v.installResp||'TBD'}`).join('\n')||'No vendors captured'}
+
+TELECOMS
+${'─'.repeat(40)}
+NBN: ${d.nbn?(d.nbnTier||'TBC'):'Not required'} | 4G SIM: ${d.sim4g?'Yes':'No'}
+VoIP: ${d.voip?`${d.voipLicences||'?'} licences${d.porting?' · porting required':''}`:'Not required'}
+${[...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Handset × ${h.qty}`),
+   ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Headset × ${h.qty}`),
+   ...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Cordless × ${h.qty}`)].join(' | ')||'No handsets / headsets'}
+
+MANAGED SERVICES
+${'─'.repeat(40)}
+${n(d.endpoints)||rooms.reduce((a,r)=>a+n(r.qty),0)} endpoints | Advanced Cyber: ${d.advancedCyber?'Yes':'No'}
+BCDR: ${d.datto?'Datto Siris':'No'} | Cloud Backup: ${d.cloudBackup?'Yes':'No'}
+${d.cyberInsurer?`Cyber Insurance: ${d.cyberInsurer}${d.cyberPolicyNumber?' | Policy: '+d.cyberPolicyNumber:''}${d.cyberExpiry?' | Expiry: '+d.cyberExpiry:''}`:'' }
+
+${d.notes?`MEETING NOTES\n${'─'.repeat(40)}\n${d.notes}`:''}`}
+              </div>
+              {internalSent && <InfoBox type="info">✅ Internal summary sent to {d.internalTeamEmail}</InfoBox>}
+              <div style={{ display:'flex', gap:10 }}>
+                <button onClick={()=>{
+                  const el=document.createElement('textarea');
+                  el.value=document.querySelector('.psb-internal-summary')?.textContent||'';
+                  navigator.clipboard.writeText(d.internalTeamEmail);
+                }} style={{ flex:1, padding:'10px', borderRadius:8, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontSize:13, fontWeight:600, cursor:'pointer' }}>
+                  Copy Summary
+                </button>
+                <button
+                  disabled={!d.internalTeamEmail||internalSending||internalSent}
+                  onClick={async()=>{
+                    if(!d.internalTeamEmail){alert('Enter a team email address above.');return;}
+                    setInternalSending(true);
+                    try{
+                      const ejs=await loadEmailJS();
+                      const autoEP=rooms.reduce((a,r)=>a+n(r.qty),0);
+                      const ep=n(d.endpoints)||autoEP;
+                      await ejs.send(EMAILJS_SERVICE_ID,'YOUR_INTERNAL_TEMPLATE_ID',{
+                        to_email:d.internalTeamEmail,
+                        practice:d.practiceName||'New Practice',
+                        sales_rep:d.salesRep||'—',
+                        go_live:d.practiceType==='new'?(d.openingDate||'TBD'):(d.goLiveDate||'TBD'),
+                        practice_type:d.practiceType==='new'?'New build':'Existing / fit-out',
+                        summary: `Practice: ${d.practiceName||'—'}, ${d.suburb||''} ${d.state||''}
+PMS: ${d.pms||'—'} | Contact: ${d.contactName||'—'} | ${d.contactEmail||'—'}
+Solutions: ${[d.q1req!==false&&'S1 Hardware',d.q2req!==false&&'S2 Telco',d.q3req!==false&&'S3 MSA'].filter(Boolean).join(', ')}
+Devices: ${rooms.map(r=>{const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];return`${r.name||'Room'}: ${dev.label} ×${n(r.qty)}`;}).join(' | ')||'—'}
+Endpoints: ${ep} | Advanced Cyber: ${d.advancedCyber?'Yes':'No'} | BCDR: ${d.datto?'Yes':'No'}
+Vendors: ${(d.vendors||[]).map(v=>`${v.company||v.type}`).join(', ')||'None'}
+${d.notes?'Notes: '+d.notes:''}`,
+                      });
+                      setInternalSent(true);
+                    }catch(e){alert('Failed to send. Check your internal EmailJS template ID.');}
+                    setInternalSending(false);
+                  }}
+                  style={{ flex:2, padding:'10px', borderRadius:8, background:internalSent?C.green:C.navyMid, color:C.white, border:'none', fontSize:13, fontWeight:700, cursor:!d.internalTeamEmail||internalSending||internalSent?'default':'pointer', opacity:!d.internalTeamEmail?.6:1, fontFamily:'Sora,sans-serif' }}>
+                  {internalSent?'✓ Sent':internalSending?'Sending…':'Send to Team'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <PhaseHeader num={6} title="Practice Blueprint" sub="Your complete technology solution, tailored for your practice." />
 
       {/* Hero */}
@@ -1069,9 +1290,13 @@ const Phase6 = ({ d, u, locked, onLock, rooms }) => {
         <h3 style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:26, margin:'0 0 4px', color:C.white, position:'relative' }}>{d.practiceName||'Your Practice'}</h3>
         <p style={{ margin:'0 0 18px', color:'#94A3B8', fontSize:15, position:'relative' }}>
           {d.principalDentist&&`${d.principalDentist} · `}{d.suburb}{d.state?`, ${d.state}`:''}{n(d.chairs)>0?` · ${d.chairs} chair${n(d.chairs)!==1?'s':''}`:''}</p>
-        {d.openingDate
-          ?<div style={{ display:'inline-flex', alignItems:'center', background:C.orange, borderRadius:9, padding:'10px 20px', position:'relative' }}><span style={{ fontSize:14, fontWeight:700, color:C.white }}>🗓 Opening {fmtDate(d.openingDate)}</span></div>
-          :<div style={{ display:'inline-flex', background:'rgba(255,255,255,.07)', borderRadius:9, padding:'10px 20px' }}><span style={{ fontSize:13, color:'#64748B' }}>Opening date not yet confirmed</span></div>}
+        {(() => {
+          const dateVal = d.practiceType==='new' ? d.openingDate : d.goLiveDate;
+          const dateLabel = d.practiceType==='new' ? 'Opening' : 'Go-Live';
+          return dateVal
+            ? <div style={{ display:'inline-flex', alignItems:'center', background:C.orange, borderRadius:9, padding:'10px 20px', position:'relative' }}><span style={{ fontSize:14, fontWeight:700, color:C.white }}>🗓 {dateLabel} {fmtDate(dateVal)}</span></div>
+            : <div style={{ display:'inline-flex', background:'rgba(255,255,255,.07)', borderRadius:9, padding:'10px 20px' }}><span style={{ fontSize:13, color:'#64748B' }}>Date not yet confirmed</span></div>;
+        })()}
         <div style={{ marginTop:14, display:'flex', gap:8, flexWrap:'wrap', position:'relative' }}>
           {[d.pms,
             ...(d.imagingSw||[]).filter(s=>s!=='Other'),
@@ -1101,9 +1326,10 @@ const Phase6 = ({ d, u, locked, onLock, rooms }) => {
       )}
 
       <SumSection title="Imaging Equipment">
-        <SumRow label="Intraoral Scanner" value={d.hasIntraoral?(d.intraoralModel||'Yes — model TBC'):null} />
-        <SumRow label="X-ray / OPG / CBCT" value={d.hasXray?(d.xrayModel?`${d.xrayModel} · ${d.xrayTiming||''}`:d.xrayType||'Yes'):null} />
-        <SumRow label="Other Imaging" value={d.hasOtherImaging?(d.otherImagingDesc||'Yes — details TBC'):null} />
+        {(d.intraoralScanners||[]).map((s,i)=><SumRow key={s.id} label={`Intraoral Scanner ${(d.intraoralScanners||[]).length>1?i+1:''}`} value={[s.model,s.software].filter(Boolean).join(' · ')||'Model TBC'} />)}
+        {(d.xrayMachines||[]).map((x,i)=><SumRow key={x.id} label={`${x.type||'X-ray'} ${(d.xrayMachines||[]).length>1?i+1:''}`} value={[x.model,x.timing].filter(Boolean).join(' · ')||'Model TBC'} />)}
+        {(d.otherImaging||[]).map((o,i)=><SumRow key={o.id} label={`Other Imaging ${(d.otherImaging||[]).length>1?i+1:''}`} value={o.desc||'Device TBC'} />)}
+        {!(d.intraoralScanners||[]).length&&!(d.xrayMachines||[]).length&&!(d.otherImaging||[]).length&&<SumRow label="Imaging" value="None captured" />}
       </SumSection>
 
       {d.q2req !== false && (
@@ -1138,6 +1364,9 @@ const Phase6 = ({ d, u, locked, onLock, rooms }) => {
         <Textarea value={d.notes||''} onChange={v=>u('notes',v)} rows={3} disabled={!!locked}
           placeholder="Anything discussed that should appear in the client summary or follow-up email…" />
       </Field>
+      <Field label="Internal Team Email" hint="Used for the internal summary — add before locking">
+        <Input type="email" value={d.internalTeamEmail||''} onChange={v=>u('internalTeamEmail',v)} placeholder="team@32byte.com.au" disabled={!!locked} />
+      </Field>
 
       {/* KQM Links */}
       <Divider label="KQM Quote Links (Internal)" />
@@ -1165,9 +1394,14 @@ const Phase6 = ({ d, u, locked, onLock, rooms }) => {
           <div style={{ fontSize:30, marginBottom:8 }}>✅</div>
           <p style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:17, color:'#065F46', margin:'0 0 4px' }}>Blueprint Locked</p>
           <p style={{ fontSize:13, color:'#047857', margin:'0 0 16px' }}>Locked {new Date(locked).toLocaleString('en-AU',{ dateStyle:'full', timeStyle:'short' })}</p>
-          <button onClick={()=>setShowEmail(true)} style={{ padding:'13px 32px', borderRadius:10, background:C.orange, color:C.white, border:'none', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'Sora,sans-serif', marginBottom:14 }}>
-            ✉️ Send Client Email
-          </button>
+          <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap', marginBottom:14 }}>
+            <button onClick={()=>setShowEmail(true)} style={{ padding:'13px 24px', borderRadius:10, background:C.orange, color:C.white, border:'none', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'Sora,sans-serif' }}>
+              ✉️ Send Client Email
+            </button>
+            <button onClick={()=>setShowInternal(true)} style={{ padding:'13px 24px', borderRadius:10, background:C.navyMid, color:C.white, border:'none', fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'Sora,sans-serif' }}>
+              📋 Send Internal Summary
+            </button>
+          </div>
           <div style={{ fontSize:13, color:'#047857', fontWeight:600 }}>Then build the three quotes in Kaseya using the KQM Entry Sheet below ↓</div>
         </div>}
 
@@ -1260,23 +1494,33 @@ const Phase6 = ({ d, u, locked, onLock, rooms }) => {
 };
 
 // ── App ────────────────────────────────────────────────────────────────────────
+const newScanner  = () => ({ id:uid(), model:'', software:'', dedicated:false, database:false, notes:'' });
+const newXray     = () => ({ id:uid(), model:'', type:'', software:'', timing:'', dedicated:false, database:false, notes:'' });
+const newOtherImg = () => ({ id:uid(), desc:'', notes:'' });
+
 const INIT = {
   practiceName:'', principalDentist:'', suburb:'', state:'', postcode:'', address:'',
   chairs:'', dentists:'', adminStaff:'', otherStaff:'',
   pms:'', pmsOther:'', imagingSw:[], imagingSwOthers:[], practiceType:'new',
-  openingDate:'', fitoutDate:'', financeProvider:'', financeOther:'',
+  openingDate:'', fitoutDate:'', goLiveDate:'', financeProvider:'', financeOther:'',
   salesRep:'', meetingDate:'', contactName:'', contactEmail:'',
+  // Existing IT (for existing sites)
+  existingIT:false,
+  existingITCompany:'', existingITContact:'', existingITPhone:'', existingITEmail:'',
+  existingITExpiry:'', existingITType:'',
+  existingITManagesEmail:false, existingITManagesPhones:false, existingITManagesInternet:false,
+  existingITManagesDevices:false, existingITManagesSecurity:false,
+  existingITNotes:'',
   vendors:[],
   rooms:[],
-  switchType:'', wifiAPs:'', apMount:'', cabling:false,
+  switchType:'', wifiAPs:'', apMount:'', floorPlanImage:null,
   cameras:false, cameraCount:'', nvrStorage:'',
   firewall:true, failover:true,
   m365Premium:'', m365F1:'',
   installHours:'', spSetup:false, emailMigration:false,
   infraNotes:'', server:'cloud',
-  hasIntraoral:false, intraoralModel:'', intraoralSoftware:'', intraoralDedicated:false, intraoralDatabase:false, intraoralNotes:'',
-  hasXray:false, xrayModel:'', xrayType:'', xraySoftware:'', xrayTiming:'', xrayDedicated:false, xrayDatabase:false, xrayNotes:'',
-  hasOtherImaging:false, otherImagingDesc:'', otherImagingNotes:'',
+  // Imaging — now arrays for multiple devices
+  intraoralScanners:[], xrayMachines:[], otherImaging:[],
   nbn:true, nbnTier:'', tenancy:'', sim4g:true,
   voip:false, voipLicences:'', ddiLines:'', porting:false,
   handsets: HANDSET_MODELS.map(m=>({ model:m, qty:'', notes:'' })),
@@ -1284,6 +1528,10 @@ const INIT = {
   cordless: CORDLESS_MODELS.map(m=>({ model:m, qty:'', notes:'' })),
   telecomNotes:'',
   endpoints:'', advancedCyber:false, datto:false, cloudBackup:false, additionalSites:'', msaNotes:'',
+  // Cyber insurance
+  cyberInsurer:'', cyberPolicyNumber:'', cyberExpiry:'',
+  // Internal team
+  internalTeamEmail:'',
   q1req:false, q2req:false, q3req:false,
   q1url:'', q2url:'', q3url:'', notes:'',
 };
