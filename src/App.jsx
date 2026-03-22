@@ -1287,9 +1287,9 @@ const QCard = ({ label, url, onChange, locked }) => (
 );
 
 // ── EmailJS config — replace with your credentials ────────────────────────────
-const EMAILJS_SERVICE_ID  = 'YOUR_SERVICE_ID';
-const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
-const EMAILJS_PUBLIC_KEY  = 'YOUR_PUBLIC_KEY';
+const EMAILJS_SERVICE_ID  = 'service_sgc4jti';
+const EMAILJS_TEMPLATE_ID = 'template_p09ril7';
+const EMAILJS_PUBLIC_KEY  = 'BHVAl9FmTs7NpCSR0';
 
 const loadEmailJS = () => new Promise((res, rej) => {
   if (window.emailjs) { res(window.emailjs); return; }
@@ -1388,14 +1388,75 @@ Return only the email text, no subject line, no preamble.`;
     setSending(true);
     try {
       const ejs = await loadEmailJS();
+      const autoEP2 = (rooms||[]).reduce((a,r)=>a+n(r.qty),0);
+      const endpoints2 = n(d.endpoints)||autoEP2;
+
+      // Build IT summary (rooms + networking only)
+      const itLines = [
+        ...(rooms||[]).map(r=>{
+          const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
+          return r.existingPC
+            ? `• ${r.name||'Room'}: Existing PC (${r.pcBrand||'brand TBC'}${r.pcAge?' · '+r.pcAge+' yrs':''})`
+            : `• ${r.name||'Room'}: ${dev.label} × ${n(r.qty)}${r.database?' + RAID':''}${r.monitor&&r.monitor!=='No Monitor'?' · '+r.monitor:''}`;
+        }),
+        d.switchType&&`• Switch: ${d.switchType}`,
+        d.wifiAPs&&`• Wi-Fi: ${d.wifiAPs}× UniFi U7 Pro${d.apMount?' ('+d.apMount+' mount)':''}`,
+        d.firewall&&`• Firewall: UDM Pro`,
+        d.failover&&`• 4G Failover: Teltonika TRB140`,
+        d.cameras&&`• Security Cameras: ${d.cameraCount||'?'}× UniFi G5${d.nvrStorage?' · '+d.nvrStorage:''}`,
+        (d.m365Premium||d.m365F1)&&`• Microsoft 365: ${[d.m365Premium&&d.m365Premium+'× Business Premium',d.m365F1&&d.m365F1+'× F1'].filter(Boolean).join(', ')}`,
+      ].filter(Boolean).join('\n') || 'Not included in this engagement.';
+
+      // Build imaging summary
+      const imagingLines = [
+        ...(d.intraoralScanners||[]).map((s,i)=>`• Intraoral Scanner${(d.intraoralScanners||[]).length>1?' '+(i+1):''}: ${s.model||'Model TBC'}${s.software?' · '+s.software:''}${s.dedicated?' · Dedicated PC':''}${s.database?' · RAID':''}`),
+        ...(d.xrayMachines||[]).map((x,i)=>`• ${x.type||'X-ray'}${(d.xrayMachines||[]).length>1?' '+(i+1):''}: ${x.model||'Model TBC'}${x.software?' · '+x.software:''}${x.timing?' · '+x.timing:''}${x.database?' · RAID':''}`),
+        ...(d.otherImaging||[]).map(o=>`• Other: ${o.desc||'TBC'}`),
+      ].filter(Boolean).join('\n') || 'No imaging equipment captured.';
+
+      // Build telco summary
+      const telcoLines = [
+        d.nbn&&`• Internet: Business NBN ${d.nbnTier||''}`,
+        d.internetType&&d.internetType!=='nbn'&&`• Internet: ${d.internetType==='fibre'?'Private Fibre':d.internetType==='leased'?'Leased Line':d.internetType} ${d.fibreSpeed||d.customSpeed||''}${d.fibreProvider?' · '+d.fibreProvider:''}`,
+        d.sim4g&&`• 4G Backup SIM: Included`,
+        d.voip&&`• VoIP Phone Service: ${d.voipLicences||'?'} licences${d.porting?' · Number porting':''}`,
+        ...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`• ${h.model} Handset: × ${h.qty}`),
+        ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`• ${h.model} Headset: × ${h.qty}`),
+        ...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>`• ${h.model} Cordless: × ${h.qty}`),
+      ].filter(Boolean).join('\n') || 'Not included in this engagement.';
+
+      // Build MSA summary
+      const msaLines = [
+        endpoints2>0&&`• TotalCare MSA: ${endpoints2} device${endpoints2!==1?'s':''}`,
+        d.advancedCyber&&`• Advanced Cyber Security Suite: Included`,
+        d.datto&&`• Datto Siris BCDR Appliance: Included`,
+        d.cloudBackup&&`• Cloud Backup: Included`,
+      ].filter(Boolean).join('\n') || 'Not included in this engagement.';
+
+      // Build quote links
+      const quoteLines = [
+        d.q1req!==false&&d.q1url&&`Solution 1 — Hardware & Infrastructure:\n${d.q1url}`,
+        d.q2req!==false&&d.q2url&&`Solution 2 — Telecommunications:\n${d.q2url}`,
+        d.q3req!==false&&d.q3url&&`Solution 3 — Managed Services:\n${d.q3url}`,
+      ].filter(Boolean).join('\n\n') || 'Quotes will be sent through shortly.';
+
+      const openingLabel = d.practiceType==='new'
+        ? (d.openingDate ? '🗓 Target Opening: '+new Date(d.openingDate+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Opening date TBC')
+        : (d.goLiveDate  ? '🗓 Go-Live: '+new Date(d.goLiveDate+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Go-live date TBC');
+
       await ejs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-        to_email:    d.contactEmail,
-        to_name:     d.contactName  || d.practiceName || 'there',
-        from_name:   d.salesRep     || '32 Byte',
-        subject:     `Your Practice Success Blueprint — ${d.practiceName||'New Practice'}`,
-        message:     email,
-        practice:    d.practiceName || '',
-        opening_date: d.openingDate ? new Date(d.openingDate+'T00:00:00').toLocaleDateString('en-AU',{ day:'numeric', month:'long', year:'numeric' }) : 'TBD',
+        to_email:        d.contactEmail,
+        to_name:         d.contactName   || d.practiceName || 'there',
+        from_name:       d.salesRep      || '32 Byte',
+        subject:         `Your Practice Success Blueprint — ${d.practiceName||'New Practice'}`,
+        message:         email,
+        practice:        d.practiceName  || '',
+        opening_date:    openingLabel,
+        it_summary:      itLines,
+        imaging_summary: imagingLines,
+        telco_summary:   telcoLines,
+        msa_summary:     msaLines,
+        quote_links:     quoteLines,
       });
       setSent(true);
     } catch(e) {
@@ -1564,7 +1625,7 @@ ${d.notes?`MEETING NOTES\n${'─'.repeat(40)}\n${d.notes}`:''}`}
                       const ejs=await loadEmailJS();
                       const autoEP=rooms.reduce((a,r)=>a+n(r.qty),0);
                       const ep=n(d.endpoints)||autoEP;
-                      await ejs.send(EMAILJS_SERVICE_ID,'YOUR_INTERNAL_TEMPLATE_ID',{
+                      await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
                         to_email:d.internalTeamEmail,
                         practice:d.practiceName||'New Practice',
                         sales_rep:d.salesRep||'—',
