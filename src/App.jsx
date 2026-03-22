@@ -106,7 +106,7 @@ const Toggle = ({ checked, onChange, label, sub }) => (
   </label>
 );
 const Row     = ({ children, cols=2, gap=14 }) => (
-  <div style={{ display:'grid', gridTemplateColumns:`repeat(${cols},1fr)`, gap }}>{children}</div>
+  <div className={`psb-row-${cols}`} style={{ display:'grid', gridTemplateColumns:`repeat(${cols},1fr)`, gap }}>{children}</div>
 );
 const Divider = ({ label }) => (
   <div style={{ display:'flex', alignItems:'center', gap:10, margin:'24px 0 18px' }}>
@@ -123,7 +123,7 @@ const PhaseHeader = ({ num, title, sub }) => (
       </div>
       <span style={{ fontSize:11, fontWeight:700, color:C.orange, letterSpacing:'.1em', textTransform:'uppercase' }}>Phase {num}</span>
     </div>
-    <h2 style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:26, color:C.textPrimary, margin:'0 0 4px' }}>{title}</h2>
+    <h2 className="psb-phase-title" style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:26, color:C.textPrimary, margin:'0 0 4px' }}>{title}</h2>
     <p style={{ margin:0, fontSize:14, color:C.textSecondary }}>{sub}</p>
   </div>
 );
@@ -2006,6 +2006,7 @@ function App() {
   const [step,   setStep]   = useState(0);
   const [locked, setLocked] = useState(null);
   const [saveMsg, setSaveMsg] = useState('');
+  const [mobileNav, setMobileNav] = useState(false);
   const [d, setD] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -2072,10 +2073,64 @@ function App() {
         button:focus{outline:none}
         input::placeholder,textarea::placeholder{color:rgba(255,255,255,.25)}
         select option{background:#1F2937;color:#F9FAFB}
+        /* Mobile responsive overrides */
+        @media(max-width:768px){
+          .psb-layout{flex-direction:column!important}
+          .psb-sidebar{display:none!important;width:100%!important;height:auto!important;position:fixed!important;inset:0!important;z-index:50!important;overflow-y:auto!important}
+          .psb-sidebar.open{display:flex!important}
+          .psb-topbar{display:flex!important}
+          .psb-main-content{padding:20px 16px 140px!important}
+          .psb-nav-bar{padding:10px 16px!important}
+          .psb-nav-label{display:none!important}
+          .psb-row-2,.psb-row-3,.psb-row-4{grid-template-columns:1fr!important}
+          .psb-pick-group{flex-wrap:wrap!important}
+          .psb-pick-group button{min-width:calc(50% - 4px)!important;flex:none!important}
+          .psb-phase-title{font-size:22px!important}
+          .psb-hero-name{font-size:20px!important}
+        }
+        @media(min-width:769px){
+          .psb-topbar{display:none!important}
+          .psb-sidebar-overlay{display:none!important}
+        }
       `}</style>
-      <div style={{ display:'flex', height:'100vh' }}>
+
+      {/* Mobile top bar */}
+      <div className="psb-topbar" style={{ display:'none', position:'fixed', top:0, left:0, right:0, zIndex:40, background:C.navy, borderBottom:'1px solid rgba(255,255,255,.07)', padding:'0 16px', height:56, alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:32, height:32, borderRadius:7, background:C.orange, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <span style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:13, color:C.white }}>32</span>
+          </div>
+          <div>
+            <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:13, color:C.white, lineHeight:1.2 }}>
+              {d.practiceName || 'Practice Blueprint'}
+            </div>
+            <div style={{ fontSize:10, color:C.orange, fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase' }}>
+              {STEPS[step]?.label}
+            </div>
+          </div>
+        </div>
+        <button onClick={()=>setMobileNav(v=>!v)} style={{ background:'none', border:`1.5px solid rgba(255,255,255,.1)`, borderRadius:8, padding:'6px 10px', cursor:'pointer', color:C.textPrimary, fontSize:18, lineHeight:1 }}>
+          ☰
+        </button>
+      </div>
+
+      {/* Mobile sidebar overlay backdrop */}
+      {mobileNav && (
+        <div className="psb-sidebar-overlay" onClick={()=>setMobileNav(false)}
+          style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:49 }} />
+      )}
+
+      <div className="psb-layout" style={{ display:'flex', height:'100vh', paddingTop:0 }}>
+
         {/* Sidebar */}
-        <div style={{ width:258, background:C.navy, display:'flex', flexDirection:'column', flexShrink:0, overflowY:'auto' }}>
+        <div className={`psb-sidebar${mobileNav?' open':''}`}
+          style={{ width:258, background:C.navy, display:'flex', flexDirection:'column', flexShrink:0, overflowY:'auto' }}>
+
+          {/* Mobile close button */}
+          <div style={{ display:'none' }} className="psb-mobile-only">
+            <button onClick={()=>setMobileNav(false)} style={{ position:'absolute', top:14, right:14, background:'none', border:'none', color:C.textMuted, fontSize:22, cursor:'pointer', zIndex:51 }}>✕</button>
+          </div>
+
           <div style={{ padding:'22px 20px 18px', borderBottom:'1px solid rgba(255,255,255,.07)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
               <div style={{ width:36, height:36, borderRadius:8, background:C.orange, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -2101,16 +2156,16 @@ function App() {
             </div>
             {d.practiceName && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,.25)', fontStyle:'italic' }}>Auto-saved locally</div>}
           </div>
+
           <div style={{ padding:'10px 0', flex:1 }}>
             {STEPS.map((s,i)=>{
               const isA=step===i, isDone=locked?true:step>i;
-              // Map step index to scope flag: 2=Vendors(q1 or new), 3=IT(q1), 4=Telco(q2), 5=MSA(q3)
               const vendorsInScope = d.q1req !== false || d.practiceType === 'new';
               const scopeMap = { 2:vendorsInScope, 3:d.q1req, 4:d.q2req, 5:d.q3req };
               const outOfScope = scopeMap[i] === false;
               return (
-                <button key={i} onClick={()=>!locked&&setStep(i)}
-                  style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'11px 20px', background:isA?'rgba(249,115,22,.1)':'transparent', border:'none', borderLeft:`3px solid ${isA?C.orange:'transparent'}`, cursor:locked?'default':'pointer', textAlign:'left', transition:'all .15s', opacity:outOfScope?.38:1 }}>
+                <button key={i} onClick={()=>{ if(!locked){ setStep(i); setMobileNav(false); } }}
+                  style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'13px 20px', background:isA?'rgba(249,115,22,.1)':'transparent', border:'none', borderLeft:`3px solid ${isA?C.orange:'transparent'}`, cursor:locked?'default':'pointer', textAlign:'left', transition:'all .15s', opacity:outOfScope?.38:1 }}>
                   <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:isDone&&!isA?C.orange:isA?'rgba(249,115,22,.2)':'rgba(255,255,255,.05)' }}>
                     {outOfScope
                       ? <span style={{ fontSize:11, color:'#64748B', fontWeight:700 }}>—</span>
@@ -2126,6 +2181,7 @@ function App() {
               );
             })}
           </div>
+
           {d.practiceName&&(
             <div style={{ padding:'14px 20px', borderTop:'1px solid rgba(255,255,255,.07)' }}>
               <div style={{ fontSize:10, fontWeight:700, color:'#64748B', letterSpacing:'.1em', textTransform:'uppercase', marginBottom:4 }}>Current Practice</div>
@@ -2135,24 +2191,40 @@ function App() {
             </div>
           )}
         </div>
+
         {/* Main */}
-        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', background:C.bg }}>
-          <div style={{ maxWidth:740, margin:'0 auto', padding:'40px 40px 120px', width:'100%' }}>
+        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', background:C.bg, paddingTop:0 }}
+          ref={el => { if(el) el._mainRef = true; }}>
+          <div className="psb-main-content" style={{ maxWidth:740, margin:'0 auto', padding:'40px 40px 120px', width:'100%' }}>
+            {/* Mobile top spacer */}
+            <div className="psb-mobile-spacer" style={{ height:0 }} />
             {phases[step]}
           </div>
           {!locked&&(
-            <div style={{ position:'sticky', bottom:0, background:'rgba(17,24,39,.97)', backdropFilter:'blur(10px)', borderTop:`1px solid ${C.border}`, padding:'13px 40px' }}>
+            <div className="psb-nav-bar" style={{ position:'sticky', bottom:0, background:'rgba(17,24,39,.97)', backdropFilter:'blur(10px)', borderTop:`1px solid ${C.border}`, padding:'13px 40px' }}>
               <div style={{ maxWidth:740, margin:'0 auto', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span style={{ fontSize:13, color:C.textMuted }}>{step<6?`Step ${step+1} of ${STEPS.length} · Next: ${STEPS[step+1]?.label}`:'Final step — review & lock'}</span>
-                <div style={{ display:'flex', gap:10 }}>
-                  {step>0&&<button onClick={()=>setStep(s=>s-1)} style={{ padding:'9px 22px', borderRadius:8, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontSize:14, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>← Back</button>}
-                  {step<STEPS.length-1&&<button onClick={()=>setStep(s=>s+1)} style={{ padding:'9px 26px', borderRadius:8, border:'none', background:C.orange, color:C.white, fontSize:14, fontWeight:700, cursor:'pointer', fontFamily:'Sora,sans-serif', transition:'background .2s' }} onMouseEnter={e=>e.target.style.background=C.orangeD} onMouseLeave={e=>e.target.style.background=C.orange}>Next →</button>}
+                <span className="psb-nav-label" style={{ fontSize:13, color:C.textMuted }}>{step<6?`Step ${step+1} of ${STEPS.length} · Next: ${STEPS[step+1]?.label}`:'Final step — review & lock'}</span>
+                <div style={{ display:'flex', gap:10, width:'100%', justifyContent:'space-between' }}>
+                  {step>0
+                    ? <button onClick={()=>setStep(s=>s-1)} style={{ flex:1, padding:'12px 22px', borderRadius:10, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontSize:15, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>← Back</button>
+                    : <div/>}
+                  {step<STEPS.length-1&&<button onClick={()=>{ setStep(s=>s+1); document.querySelector('[style*="flex:1"][style*="overflowY"]')?.scrollTo(0,0); }} style={{ flex:2, padding:'12px 26px', borderRadius:10, border:'none', background:C.orange, color:C.white, fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'Sora,sans-serif', transition:'background .2s' }}>Next →</button>}
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      <style>{`
+        @media(max-width:768px){
+          .psb-topbar{display:flex!important}
+          .psb-layout{padding-top:56px!important}
+          .psb-main-content{padding:20px 16px 140px!important}
+          .psb-nav-bar{padding:10px 16px!important}
+          .psb-nav-label{display:none!important}
+        }
+      `}</style>
     </>
   );
 }
