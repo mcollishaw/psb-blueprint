@@ -270,6 +270,19 @@ const Phase0 = ({ d, u }) => (
       <div style={{ fontSize:13, fontWeight:600, color:C.textPrimary, marginBottom:4 }}>Not ready yet?</div>
       <div style={{ fontSize:13, color:C.textSecondary, lineHeight:1.5 }}>Skip ahead and come back. URLs can be pasted at any point and will appear as links throughout the Blueprint.</div>
     </div>
+
+    <Divider label="Meeting Details" />
+    <Row>
+      <Field label="32 Byte Sales Rep"><Input value={d.salesRep||''} onChange={v=>u('salesRep',v)} placeholder="Your name" /></Field>
+      <Field label="Meeting Date"><Input type="date" value={d.meetingDate||''} onChange={v=>u('meetingDate',v)} /></Field>
+    </Row>
+    <Row>
+      <Field label="Client Contact Name"><Input value={d.contactName||''} onChange={v=>u('contactName',v)} placeholder="Name and role" /></Field>
+      <Field label="Client Email" hint="Used for the follow-up email"><Input type="email" value={d.contactEmail||''} onChange={v=>u('contactEmail',v)} placeholder="email@practice.com.au" /></Field>
+    </Row>
+    <Field label="Internal Team Email" hint="For internal summary email after locking">
+      <Input type="email" value={d.internalTeamEmail||''} onChange={v=>u('internalTeamEmail',v)} placeholder="team@32byte.com.au" />
+    </Field>
   </div>
 );
 
@@ -351,16 +364,31 @@ const Phase1 = ({ d, u }) => {
               <Field label="Contract Expiry" tight>
                 <Input type="date" value={d.existingITExpiry||''} onChange={v=>u('existingITExpiry',v)} />
               </Field>
-              <Field label="What does the current provider manage?" hint="Select all that apply">
-                <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:4 }}>
+              <Field label="What does the current provider manage?" hint="All items default to yes — toggle off if they don't manage that item, then capture who does.">
+                <div style={{ display:'flex', flexDirection:'column', gap:12, marginTop:4 }}>
                   {[
-                    {k:'existingITManagesDevices',  l:'Devices (computers, servers)'},
-                    {k:'existingITManagesEmail',     l:'Email (Microsoft 365 / Google)'},
-                    {k:'existingITManagesPhones',    l:'Phone system'},
-                    {k:'existingITManagesInternet',  l:'Internet / NBN'},
-                    {k:'existingITManagesSecurity',  l:'Security (AV, patching, monitoring)'},
-                  ].map(({k,l})=>(
-                    <Toggle key={k} checked={!!d[k]} onChange={v=>u(k,v)} label={l} />
+                    {k:'existingITManagesDevices',  pk:'existingITDevices',  l:'Devices (computers, servers)'},
+                    {k:'existingITManagesEmail',     pk:'existingITEmail',    l:'Email (Microsoft 365 / Google)'},
+                    {k:'existingITManagesPhones',    pk:'existingITPhones',   l:'Phone system'},
+                    {k:'existingITManagesInternet',  pk:'existingITInternet', l:'Internet / NBN'},
+                    {k:'existingITManagesSecurity',  pk:'existingITSecurity', l:'Security (AV, patching, monitoring)'},
+                  ].map(({k,pk,l})=>(
+                    <div key={k}>
+                      <Toggle checked={d[k]!==false} onChange={v=>u(k,v)} label={l} sub={d[k]!==false?'Managed by existing IT provider':'Not managed by existing IT — capture responsible party below'} />
+                      {d[k]===false && (
+                        <div style={{ marginLeft:54, marginTop:10, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
+                          <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Who manages {l.toLowerCase()}?</div>
+                          <Row>
+                            <Field label="Company" tight><Input value={(d[pk]||{}).company||''} onChange={v=>u(pk,{...(d[pk]||{}),company:v})} placeholder="Provider / company name" /></Field>
+                            <Field label="Contact" tight><Input value={(d[pk]||{}).contact||''} onChange={v=>u(pk,{...(d[pk]||{}),contact:v})} placeholder="Contact name" /></Field>
+                          </Row>
+                          <Row>
+                            <Field label="Phone" tight><Input value={(d[pk]||{}).phone||''} onChange={v=>u(pk,{...(d[pk]||{}),phone:v})} placeholder="Phone" /></Field>
+                            <Field label="Email" tight><Input type="email" value={(d[pk]||{}).email||''} onChange={v=>u(pk,{...(d[pk]||{}),email:v})} placeholder="email@provider.com" /></Field>
+                          </Row>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </Field>
@@ -376,15 +404,6 @@ const Phase1 = ({ d, u }) => {
         <Select value={d.financeProvider||''} onChange={v=>u('financeProvider',v)} options={FINANCE_OPTS} placeholder="Select provider (if applicable)…" />
       </Field>
       {d.financeProvider==='Other' && <Field label="Finance Provider Name" tight><Input value={d.financeOther||''} onChange={v=>u('financeOther',v)} placeholder="Enter provider name" /></Field>}
-      <Divider label="Meeting Details" />
-      <Row>
-        <Field label="32 Byte Sales Rep"><Input value={d.salesRep||''} onChange={v=>u('salesRep',v)} placeholder="Your name" /></Field>
-        <Field label="Meeting Date"><Input type="date" value={d.meetingDate||''} onChange={v=>u('meetingDate',v)} /></Field>
-      </Row>
-      <Row>
-        <Field label="Client Contact Name"><Input value={d.contactName||''} onChange={v=>u('contactName',v)} placeholder="Name and role" /></Field>
-        <Field label="Client Email" hint="Used for the follow-up email"><Input type="email" value={d.contactEmail||''} onChange={v=>u('contactEmail',v)} placeholder="email@practice.com.au" /></Field>
-      </Row>
     </div>
   );
 };
@@ -421,6 +440,11 @@ const Phase2 = ({ d, u }) => {
             <Field label="Vendor Type" tight><Select value={v.type} onChange={val=>updV(v.id,'type',val)} options={VENDOR_TYPES} placeholder="Select type…" /></Field>
             <Field label="Company Name" tight><Input value={v.company} onChange={val=>updV(v.id,'company',val)} placeholder="Company name" /></Field>
           </Row>
+          {v.type==='Other' && (
+            <Field label="Specify Vendor Type" tight hint="Describe the type of vendor">
+              <Input value={v.customType||''} onChange={val=>updV(v.id,'customType',val)} placeholder="e.g. Dental equipment supplier, IT cabling contractor…" />
+            </Field>
+          )}
           <Row cols={3}>
             <Field label="Contact Name" tight><Input value={v.contact} onChange={val=>updV(v.id,'contact',val)} placeholder="Name" /></Field>
             <Field label="Phone" tight><Input value={v.phone} onChange={val=>updV(v.id,'phone',val)} placeholder="04xx xxx xxx" /></Field>
@@ -432,7 +456,7 @@ const Phase2 = ({ d, u }) => {
                 {INSTALL_RESP.map(r=>{
                   const a=v.installResp===r;
                   const col=r==='32 Byte'?C.green:r==='Vendor'?C.amber:C.gray400;
-                  return <button key={r} onClick={()=>updV(v.id,'installResp',r)} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?col:C.gray200}`, background:a?`${col}22`:C.surface, color:a?col:C.gray600 }}>{r}</button>;
+                  return <button key={r} onClick={()=>updV(v.id,'installResp',r)} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?col:C.border}`, background:a?`${col}22`:C.surfaceHi, color:a?col:C.textPrimary }}>{r}</button>;
                 })}
               </div>
               {v.installResp==='Vendor'&&<InfoBox type="alert">Conflict — vendor expects to install software. Coordinate with 32 Byte immediately. This may impact the installation schedule.</InfoBox>}
@@ -446,7 +470,7 @@ const Phase2 = ({ d, u }) => {
         <>
           <Divider label="Imaging Vendor Install Summary" />
           {imgV.map(v=>(
-            <div key={v.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 14px', background:v.installResp==='Vendor'?C.redLight:v.installResp==='32 Byte'?C.greenLight:C.amberLight, border:`1px solid ${v.installResp==='Vendor'?C.redBorder:v.installResp==='32 Byte'?C.greenBorder:C.amberBorder}`, borderRadius:8, marginBottom:7 }}>
+            <div key={v.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'9px 14px', background:v.installResp==='Vendor'?'rgba(239,68,68,.15)':v.installResp==='32 Byte'?'rgba(16,185,129,.15)':'rgba(245,158,11,.15)', border:`1px solid ${v.installResp==='Vendor'?C.red:v.installResp==='32 Byte'?C.green:C.amber}`, borderRadius:8, marginBottom:7 }}>
               <span style={{ fontSize:13, fontWeight:600, color:C.textPrimary }}>{v.company||v.type}</span>
               <span style={{ fontSize:12, fontWeight:700, color:v.installResp==='Vendor'?C.red:v.installResp==='32 Byte'?C.green:C.amber }}>Install: {v.installResp||'TBD'}</span>
             </div>
@@ -460,7 +484,7 @@ const Phase2 = ({ d, u }) => {
 // ── Phase 3 ───────────────────────────────────────────────────────────────────
 const Phase3 = ({ d, u }) => {
   const rooms = d.rooms||[];
-  const addR  = () => u('rooms',[...rooms,{ id:uid(), name:'', deviceType:'practice', qty:1, monitor:'27" QHD', kbMouse:true, database:false, notes:'' }]);
+  const addR  = () => u('rooms',[...rooms,{ id:uid(), name:'', deviceType:'practice', qty:1, monitor:'27" QHD', kbMouse:true, database:false, notes:'', existingPC:false, pcAge:'', pcBrand:'', pcCondition:'Functional', pcNotes:'' }]);
   const updR  = (id,k,v) => u('rooms', rooms.map(x=>x.id===id?{...x,[k]:v}:x));
   const delR  = id => u('rooms', rooms.filter(x=>x.id!==id));
   const totalD = rooms.reduce((a,r)=>a+n(r.qty),0);
@@ -540,6 +564,27 @@ const Phase3 = ({ d, u }) => {
               </Field>
             </Row>
             <Field label="Notes" tight><Input value={r.notes} onChange={v=>updR(r.id,'notes',v)} placeholder="Imaging software, peripheral devices, special requirements…" /></Field>
+            <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${C.border}` }}>
+              <Toggle checked={!!r.existingPC} onChange={v=>updR(r.id,'existingPC',v)} label="Existing computer in this room" sub={r.existingPC?'Capture details below — may be reusable or require assessment':'New computer will be supplied'} />
+              {r.existingPC && (
+                <div style={{ marginLeft:54, marginTop:10, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Existing Computer Details</div>
+                  <Row>
+                    <Field label="Brand / Model" tight><Input value={r.pcBrand||''} onChange={v=>updR(r.id,'pcBrand',v)} placeholder="e.g. Dell OptiPlex, HP EliteDesk…" /></Field>
+                    <Field label="Age (years)" tight><Input type="number" value={r.pcAge||''} onChange={v=>updR(r.id,'pcAge',v)} placeholder="e.g. 3" /></Field>
+                  </Row>
+                  <Field label="Condition" tight>
+                    <div style={{ display:'flex', gap:6 }}>
+                      {['Good','Functional','Poor','Unknown'].map(c=>{
+                        const a=r.pcCondition===c;
+                        return <button key={c} onClick={()=>updR(r.id,'pcCondition',c)} style={{ flex:1, padding:'7px 6px', borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surface, color:a?C.orange:C.textSecondary }}>{c}</button>;
+                      })}
+                    </div>
+                  </Field>
+                  <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="Specs, OS, issues, reuse potential…" /></Field>
+                </div>
+              )}
+            </div>
           </Card>
         );
       })}
@@ -665,6 +710,21 @@ const Phase3 = ({ d, u }) => {
           <Num value={d.wifiAPs||''} onChange={v=>u('wifiAPs',v)} />
         </Field>
       </Row>
+      <Toggle checked={!!d.existingNetwork} onChange={v=>u('existingNetwork',v)} label="Existing network equipment in place" sub={d.existingNetwork?'Capture details below':'No existing network equipment'} />
+      {d.existingNetwork && (
+        <div style={{ marginLeft:54, marginTop:10, padding:'14px 16px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}`, marginBottom:12 }}>
+          <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Existing Network Equipment</div>
+          <Row>
+            <Field label="Switch Vendor / Model" tight><Input value={d.existingSwitchModel||''} onChange={v=>u('existingSwitchModel',v)} placeholder="e.g. Cisco SG350, Netgear GS308" /></Field>
+            <Field label="Switch Managed By" tight><Input value={d.existingSwitchVendor||''} onChange={v=>u('existingSwitchVendor',v)} placeholder="Who manages this?" /></Field>
+          </Row>
+          <Row>
+            <Field label="Wi-Fi Vendor / Model" tight><Input value={d.existingWifiModel||''} onChange={v=>u('existingWifiModel',v)} placeholder="e.g. Ubiquiti, Aruba, Cisco Meraki" /></Field>
+            <Field label="Wi-Fi Managed By" tight><Input value={d.existingWifiVendor||''} onChange={v=>u('existingWifiVendor',v)} placeholder="Who manages this?" /></Field>
+          </Row>
+          <Field label="Notes" tight><Input value={d.existingNetworkNotes||''} onChange={v=>u('existingNetworkNotes',v)} placeholder="Age, condition, configuration notes, reuse potential…" /></Field>
+        </div>
+      )}
       <Field label="AP Mounting">
         <div style={{ display:'flex', gap:8 }}>
           {['Ceiling','Wall','Mixed'].map(o=>{
@@ -695,18 +755,60 @@ const Phase3 = ({ d, u }) => {
       <Divider label="Security Cameras (UniFi G5 Turret)" />
       <Toggle checked={!!d.cameras} onChange={v=>u('cameras',v)} label="Security cameras required" />
       {d.cameras&&(
-        <Row style={{ marginTop:14 }}>
-          <Field label="Number of Cameras"><Num value={d.cameraCount||''} onChange={v=>u('cameraCount',v)} /></Field>
-          <Field label="NVR Storage" hint="8TB recommended for 30-day high-res retention">
-            <Select value={d.nvrStorage||''} onChange={v=>u('nvrStorage',v)} placeholder="Select…" options={['4 TB HDD','8 TB HDD (recommended)','12 TB HDD','16 TB HDD']} />
-          </Field>
-        </Row>
+        <div style={{ marginTop:12 }}>
+          <Row>
+            <Field label="Number of Cameras"><Num value={d.cameraCount||''} onChange={v=>u('cameraCount',v)} /></Field>
+            <Field label="NVR Storage" hint="8TB recommended for 30-day high-res retention">
+              <Select value={d.nvrStorage||''} onChange={v=>u('nvrStorage',v)} placeholder="Select…" options={['4 TB HDD','8 TB HDD (recommended)','12 TB HDD','16 TB HDD']} />
+            </Field>
+          </Row>
+          <Toggle checked={!!d.existingCameras} onChange={v=>u('existingCameras',v)} label="Existing camera system in place" />
+          {d.existingCameras && (
+            <div style={{ marginLeft:54, marginTop:10, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
+              <Row>
+                <Field label="Vendor / Brand" tight><Input value={d.existingCameraVendor||''} onChange={v=>u('existingCameraVendor',v)} placeholder="e.g. Hikvision, Dahua, Axis" /></Field>
+                <Field label="Number of existing cameras" tight><Num value={d.existingCameraCount||''} onChange={v=>u('existingCameraCount',v)} /></Field>
+              </Row>
+              <Field label="Notes" tight><Input value={d.existingCameraNotes||''} onChange={v=>u('existingCameraNotes',v)} placeholder="Age, condition, NVR details, reuse potential…" /></Field>
+            </div>
+          )}
+          <div style={{ marginTop:12 }}>
+            <Field label="Camera Layout / Location Diagram" hint="Upload a floor plan showing proposed camera positions.">
+              <div style={{ marginBottom:8 }}>
+                <label style={{ display:'inline-block', padding:'9px 18px', borderRadius:8, border:`2px dashed ${C.border}`, background:C.surfaceHi, color:C.orange, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                  📎 Upload Camera Layout
+                  <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{
+                    const f=e.target.files[0]; if(!f) return;
+                    const r=new FileReader(); r.onload=ev=>u('cameraLayoutImage',ev.target.result); r.readAsDataURL(f);
+                  }} />
+                </label>
+                {d.cameraLayoutImage && <button onClick={()=>u('cameraLayoutImage',null)} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
+              </div>
+              {d.cameraLayoutImage && (
+                <div style={{ borderRadius:10, overflow:'hidden', border:`1.5px solid ${C.border}`, maxHeight:400 }}>
+                  <img src={d.cameraLayoutImage} alt="Camera layout" style={{ width:'100%', display:'block', objectFit:'contain' }} />
+                </div>
+              )}
+            </Field>
+          </div>
+        </div>
       )}
 
       {/* Firewall */}
       <Divider label="Firewall & 4G Failover" />
       <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-        <Toggle checked={!!d.firewall} onChange={v=>u('firewall',v)} label="UDM Pro Firewall" sub="All-in-one firewall, VPN, network controller — recommended for all practices" />
+        <div>
+          <Toggle checked={!!d.firewall} onChange={v=>u('firewall',v)} label="UDM Pro Firewall" sub="All-in-one firewall, VPN, network controller — recommended for all practices" />
+          <Toggle checked={!!d.existingFirewall} onChange={v=>u('existingFirewall',v)} label="Existing firewall in place" sub={d.existingFirewall?'Capture details below':'No existing firewall'} />
+          {d.existingFirewall && (
+            <div style={{ marginLeft:54, marginTop:8, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
+              <Row>
+                <Field label="Brand / Model" tight><Input value={d.existingFirewallModel||''} onChange={v=>u('existingFirewallModel',v)} placeholder="e.g. Cisco, SonicWall, Meraki" /></Field>
+                <Field label="Managed by" tight><Input value={d.existingFirewallVendor||''} onChange={v=>u('existingFirewallVendor',v)} placeholder="Who manages this?" /></Field>
+              </Row>
+            </div>
+          )}
+        </div>
         <Toggle checked={!!d.failover} onChange={v=>u('failover',v)} label="Teltonika TRB140 4G Failover Router" sub="Keeps the practice running if NBN drops — essential for cloud-based practices" />
       </div>
 
@@ -768,10 +870,24 @@ const Phase4 = ({ d, u }) => {
           <button onClick={()=>u('q2req',true)} style={{ fontSize:12, fontWeight:700, color:C.orange, background:C.surface, border:`1.5px solid ${C.orange}`, borderRadius:7, padding:'4px 12px', cursor:'pointer', whiteSpace:'nowrap' }}>Add to scope</button>
         </div>
       )}
-      <Divider label="NBN Internet Connection" />
-      <Toggle checked={!!d.nbn} onChange={v=>u('nbn',v)} label="Business NBN required" sub="Best-effort, 4hr eSLA, 24/7 support" />
-      {d.nbn&&(
-        <>
+      <Divider label="Internet Connection" />
+      <Field label="Connection Type">
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          {[
+            {v:'nbn',    l:'Business NBN'},
+            {v:'fibre',  l:'Private Fibre'},
+            {v:'leased', l:'Leased Line'},
+            {v:'other',  l:'Other'},
+            {v:'none',   l:'None / TBC'},
+          ].map(o=>{
+            const a=(d.internetType||'nbn')===o.v;
+            return <button key={o.v} onClick={()=>u('internetType',o.v)} style={{ padding:'9px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o.l}</button>;
+          })}
+        </div>
+      </Field>
+
+      {(d.internetType||'nbn')==='nbn' && (
+        <div style={{ marginTop:4 }}>
           <Field label="NBN Speed Tier" tight hint="250/100 recommended for most practices. 1000/400 for high-volume imaging or multi-site.">
             <Select value={d.nbnTier||''} onChange={v=>u('nbnTier',v)} options={NBN_TIERS} placeholder="Select tier…" />
           </Field>
@@ -784,8 +900,33 @@ const Phase4 = ({ d, u }) => {
             </div>
           </Field>
           {d.tenancy==='new'&&<InfoBox type="warn">New tenancy — NBN termination charge may apply (~$300 passthrough). 32 Byte will confirm with NBN co.</InfoBox>}
-        </>
+        </div>
       )}
+
+      {(d.internetType==='fibre'||d.internetType==='leased') && (
+        <div style={{ marginTop:4 }}>
+          <Row>
+            <Field label="Provider" tight><Input value={d.fibreProvider||''} onChange={v=>u('fibreProvider',v)} placeholder="e.g. Telstra, Vocus, Aussie BB" /></Field>
+            <Field label="Speed" tight>
+              <Select value={d.fibreSpeed||''} onChange={v=>u('fibreSpeed',v)} placeholder="Select speed…"
+                options={['100/100 Mbps','250/250 Mbps','500/500 Mbps','1000/1000 Mbps','10 Gbps','Other']} />
+            </Field>
+          </Row>
+          {d.fibreSpeed==='Other' && <Field label="Custom Speed" tight><Input value={d.customSpeed||''} onChange={v=>u('customSpeed',v)} placeholder="e.g. 200/200 Mbps" /></Field>}
+          <Field label="Contract Expiry" tight><Input type="date" value={d.internetExpiry||''} onChange={v=>u('internetExpiry',v)} /></Field>
+        </div>
+      )}
+
+      {d.internetType==='other' && (
+        <div style={{ marginTop:4 }}>
+          <Row>
+            <Field label="Connection Description" tight><Input value={d.otherInternetDesc||''} onChange={v=>u('otherInternetDesc',v)} placeholder="Describe the connection type" /></Field>
+            <Field label="Speed" tight><Input value={d.customSpeed||''} onChange={v=>u('customSpeed',v)} placeholder="e.g. 100/100 Mbps" /></Field>
+          </Row>
+          <Field label="Provider" tight><Input value={d.fibreProvider||''} onChange={v=>u('fibreProvider',v)} placeholder="Provider name" /></Field>
+        </div>
+      )}
+
       <div style={{ marginTop:14 }}>
         <Toggle checked={!!d.sim4g} onChange={v=>u('sim4g',v)} label="4G Backup SIM (Unlimited Data)" sub="Works with Teltonika failover router. Always recommend for cloud-based practices." />
       </div>
@@ -800,6 +941,86 @@ const Phase4 = ({ d, u }) => {
       )}
       {d.voip&&(
         <Toggle checked={!!d.porting} onChange={v=>u('porting',v)} label="Number porting required" sub="Existing number(s) to be transferred" />
+      )}
+
+      {d.voip&&(
+        <div style={{ marginTop:16 }}>
+          <Divider label="Call Flow" />
+          <InfoBox>Design the call flow for this practice. Select a default template or customise each step.</InfoBox>
+          <Field label="Call Flow Type">
+            <div style={{ display:'flex', gap:8 }}>
+              {[{v:'default',l:'Default Dental Practice'},{v:'custom',l:'Custom'}].map(o=>{
+                const a=(d.callFlowType||'default')===o.v;
+                return <button key={o.v} onClick={()=>u('callFlowType',o.v)} style={{ flex:1, padding:'9px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o.l}</button>;
+              })}
+            </div>
+          </Field>
+
+          {/* Visual call flow diagram */}
+          <div style={{ background:C.navy, borderRadius:12, padding:'20px', marginBottom:16 }}>
+            <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.08em', marginBottom:16, textAlign:'center' }}>
+              {(d.callFlowType||'default')==='default' ? 'Default Call Flow' : 'Custom Call Flow'}
+            </div>
+            {/* Node helper */}
+            {(() => {
+              const Node = ({icon,label,sub,color='#1E3869'}) => (
+                <div style={{ background:color, border:`1.5px solid rgba(255,255,255,.15)`, borderRadius:9, padding:'10px 14px', textAlign:'center', minWidth:140 }}>
+                  <div style={{ fontSize:18, marginBottom:4 }}>{icon}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color:C.white, lineHeight:1.3 }}>{label}</div>
+                  {sub&&<div style={{ fontSize:10, color:'rgba(255,255,255,.5)', marginTop:3 }}>{sub}</div>}
+                </div>
+              );
+              const Arrow = () => <div style={{ textAlign:'center', color:'rgba(255,255,255,.3)', fontSize:18, lineHeight:1.2, margin:'4px 0' }}>↓</div>;
+              const Split = ({left,right}) => (
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, margin:'4px 0' }}>
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                    <div style={{ fontSize:10, color:C.green, fontWeight:700 }}>OPEN</div>
+                    {left}
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                    <div style={{ fontSize:10, color:C.amber, fontWeight:700 }}>CLOSED</div>
+                    {right}
+                  </div>
+                </div>
+              );
+              if((d.callFlowType||'default')==='default') return (
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+                  <Node icon="📞" label="Incoming Call" />
+                  <Arrow />
+                  <Node icon="🎙️" label={d.callFlowGreeting||'Welcome Message'} sub="Auto-attendant greeting" color="rgba(249,115,22,.3)" />
+                  <Arrow />
+                  <Node icon="🕐" label="Business Hours Check" />
+                  <Split
+                    left={<><Node icon="📳" label={d.callFlowHuntGroup||'Ring All Phones'} sub={`${d.voipLicences||'?'} extensions`} color="rgba(16,185,129,.2)" /><Arrow /><Node icon="📬" label="Voicemail" sub="Email to practice" color="#1E3869" /></>}
+                    right={<><Node icon="🔔" label={d.callFlowAfterHours||'After Hours Message'} sub="Closed greeting" color="rgba(245,158,11,.2)" /><Arrow /><Node icon={d.callFlowOverflow?'📱':'📬'} label={d.callFlowOverflow||'Voicemail'} sub={d.callFlowOverflow?'Mobile overflow':'Email notification'} color="#1E3869" /></>}
+                  />
+                </div>
+              );
+              return (
+                <div style={{ textAlign:'center', color:C.textMuted, fontSize:13, padding:'20px 0' }}>
+                  Custom call flow — describe the routing in the notes below.
+                </div>
+              );
+            })()}
+          </div>
+
+          {(d.callFlowType||'default')==='default' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <Row>
+                <Field label="Welcome Greeting" tight hint="What callers hear when they call"><Input value={d.callFlowGreeting||''} onChange={v=>u('callFlowGreeting',v)} placeholder="e.g. Thanks for calling [Practice Name]…" /></Field>
+                <Field label="Hunt Group Behaviour" tight><Select value={d.callFlowHuntGroup||''} onChange={v=>u('callFlowHuntGroup',v)} placeholder="Select…" options={['Ring all phones simultaneously','Ring in sequence','Ring reception first, then all']} /></Field>
+              </Row>
+              <Row>
+                <Field label="After Hours Message" tight><Input value={d.callFlowAfterHours||''} onChange={v=>u('callFlowAfterHours',v)} placeholder="e.g. We are currently closed. Our hours are…" /></Field>
+                <Field label="After Hours Overflow (optional)" tight hint="Mobile number to forward to after hours"><Input value={d.callFlowOverflow||''} onChange={v=>u('callFlowOverflow',v)} placeholder="e.g. 04xx xxx xxx" /></Field>
+              </Row>
+              <Field label="Voicemail Email" tight hint="Voicemail recordings emailed here"><Input type="email" value={d.callFlowVoicemailEmail||''} onChange={v=>u('callFlowVoicemailEmail',v)} placeholder="reception@practice.com.au" /></Field>
+            </div>
+          )}
+          <Field label="Call Flow Notes" tight>
+            <Textarea value={d.callFlowNotes||''} onChange={v=>u('callFlowNotes',v)} rows={2} placeholder="Special routing requirements, IVR options, multiple queues…" />
+          </Field>
+        </div>
       )}
 
       <Divider label="Desk Handsets" />
@@ -1508,8 +1729,9 @@ const INIT = {
   existingIT:false,
   existingITCompany:'', existingITContact:'', existingITPhone:'', existingITEmail:'',
   existingITExpiry:'', existingITType:'',
-  existingITManagesEmail:false, existingITManagesPhones:false, existingITManagesInternet:false,
-  existingITManagesDevices:false, existingITManagesSecurity:false,
+  existingITManagesEmail:undefined, existingITManagesPhones:undefined, existingITManagesInternet:undefined,
+  existingITManagesDevices:undefined, existingITManagesSecurity:undefined,
+  existingITDevices:null, existingITEmail:null, existingITPhones:null, existingITInternet:null, existingITSecurity:null,
   existingITNotes:'',
   vendors:[],
   rooms:[],
@@ -1534,13 +1756,64 @@ const INIT = {
   internalTeamEmail:'',
   q1req:false, q2req:false, q3req:false,
   q1url:'', q2url:'', q3url:'', notes:'',
+  // Internet
+  internetType:'nbn', fibreProvider:'', fibreSpeed:'', customSpeed:'', otherInternetDesc:'', internetExpiry:'',
+  // Existing network equipment
+  existingNetwork:false, existingSwitchModel:'', existingSwitchVendor:'', existingWifiModel:'', existingWifiVendor:'', existingNetworkNotes:'',
+  existingFirewall:false, existingFirewallModel:'', existingFirewallVendor:'',
+  existingCameras:false, existingCameraVendor:'', existingCameraCount:'', existingCameraNotes:'', cameraLayoutImage:null,
+  // Call flow
+  callFlowType:'default', callFlowGreeting:'', callFlowHuntGroup:'', callFlowAfterHours:'', callFlowOverflow:'', callFlowVoicemailEmail:'', callFlowNotes:'',
 };
+
+const STORAGE_KEY = 'psb_data_v1';
 
 export default function App() {
   const [step,   setStep]   = useState(0);
   const [locked, setLocked] = useState(null);
-  const [d, setD]           = useState(INIT);
-  const u = (k,v) => setD(p=>({...p,[k]:v}));
+  const [saveMsg, setSaveMsg] = useState('');
+  const [d, setD] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if(saved) { const p = JSON.parse(saved); return {...INIT, ...p}; }
+    } catch(e) {}
+    return INIT;
+  });
+  const u = (k,v) => setD(p => {
+    const next = {...p,[k]:v};
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch(e) {}
+    return next;
+  });
+
+  const exportData = () => {
+    const blob = new Blob([JSON.stringify(d, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `blueprint-${d.practiceName||'draft'}-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    setSaveMsg('Exported!'); setTimeout(()=>setSaveMsg(''),2000);
+  };
+
+  const importData = (e) => {
+    const f = e.target.files[0]; if(!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        setD({...INIT, ...imported});
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify({...INIT,...imported})); } catch(e) {}
+        setSaveMsg('Imported!'); setTimeout(()=>setSaveMsg(''),2000);
+      } catch(e) { alert('Invalid file — could not import.'); }
+    };
+    r.readAsText(f);
+  };
+
+  const clearData = () => {
+    if(!window.confirm('Clear all data and start fresh? This cannot be undone.')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    setD(INIT); setLocked(null); setStep(0);
+  };
+
   const shortDate = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-AU',{ day:'numeric', month:'short', year:'numeric' }) : null;
 
   const phases = [
@@ -1579,7 +1852,20 @@ export default function App() {
                 <div style={{ fontSize:11, color:'#475569' }}>Dental IT Specialists</div>
               </div>
             </div>
-            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'.1em', color:C.orange, textTransform:'uppercase' }}>Practice Success Blueprint</div>
+            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'.1em', color:C.orange, textTransform:'uppercase', marginBottom:10 }}>Practice Success Blueprint</div>
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={exportData} title="Export to file" style={{ flex:1, padding:'6px 4px', borderRadius:6, border:`1px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', color:C.textSecondary, fontSize:10, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                {saveMsg==='Exported!'?'✓ Saved':'⬇ Export'}
+              </button>
+              <label title="Import from file" style={{ flex:1, padding:'6px 4px', borderRadius:6, border:`1px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', color:C.textSecondary, fontSize:10, fontWeight:600, cursor:'pointer', textAlign:'center', display:'block' }}>
+                {saveMsg==='Imported!'?'✓ Loaded':'⬆ Import'}
+                <input type="file" accept=".json" style={{ display:'none' }} onChange={importData} />
+              </label>
+              <button onClick={clearData} title="Clear all data" style={{ padding:'6px 8px', borderRadius:6, border:`1px solid rgba(255,255,255,.1)`, background:'rgba(255,255,255,.06)', color:'rgba(239,68,68,.6)', fontSize:10, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>
+                ✕
+              </button>
+            </div>
+            {d.practiceName && <div style={{ marginTop:6, fontSize:10, color:'rgba(255,255,255,.25)', fontStyle:'italic' }}>Auto-saved locally</div>}
           </div>
           <div style={{ padding:'10px 0', flex:1 }}>
             {STEPS.map((s,i)=>{
