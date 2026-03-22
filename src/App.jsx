@@ -2049,6 +2049,12 @@ function App() {
     setD(INIT); setLocked(null); setStep(0);
   };
 
+  const goStep = (i) => {
+    setStep(i);
+    setMobileNav(false);
+    document.getElementById('psb-main')?.scrollTo(0, 0);
+  };
+
   const shortDate = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-AU',{ day:'numeric', month:'short', year:'numeric' }) : null;
 
   const phases = [
@@ -2164,7 +2170,7 @@ function App() {
               const scopeMap = { 2:vendorsInScope, 3:d.q1req, 4:d.q2req, 5:d.q3req };
               const outOfScope = scopeMap[i] === false;
               return (
-                <button key={i} onClick={()=>{ if(!locked){ setStep(i); setMobileNav(false); } }}
+                <button key={i} onClick={()=>!locked&&goStep(i)}
                   style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'13px 20px', background:isA?'rgba(249,115,22,.1)':'transparent', border:'none', borderLeft:`3px solid ${isA?C.orange:'transparent'}`, cursor:locked?'default':'pointer', textAlign:'left', transition:'all .15s', opacity:outOfScope?.38:1 }}>
                   <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:isDone&&!isA?C.orange:isA?'rgba(249,115,22,.2)':'rgba(255,255,255,.05)' }}>
                     {outOfScope
@@ -2193,7 +2199,7 @@ function App() {
         </div>
 
         {/* Main */}
-        <div style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', background:C.bg, paddingTop:0 }}
+        <div id="psb-main" style={{ flex:1, overflowY:'auto', display:'flex', flexDirection:'column', background:C.bg, paddingTop:0 }}
           ref={el => { if(el) el._mainRef = true; }}>
           <div className="psb-main-content" style={{ maxWidth:740, margin:'0 auto', padding:'40px 40px 120px', width:'100%' }}>
             {/* Mobile top spacer */}
@@ -2206,9 +2212,9 @@ function App() {
                 <span className="psb-nav-label" style={{ fontSize:13, color:C.textMuted }}>{step<6?`Step ${step+1} of ${STEPS.length} · Next: ${STEPS[step+1]?.label}`:'Final step — review & lock'}</span>
                 <div style={{ display:'flex', gap:10, width:'100%', justifyContent:'space-between' }}>
                   {step>0
-                    ? <button onClick={()=>setStep(s=>s-1)} style={{ flex:1, padding:'12px 22px', borderRadius:10, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontSize:15, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>← Back</button>
+                    ? <button onClick={()=>goStep(step-1)} style={{ flex:1, padding:'12px 22px', borderRadius:10, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontSize:15, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>← Back</button>
                     : <div/>}
-                  {step<STEPS.length-1&&<button onClick={()=>{ setStep(s=>s+1); document.querySelector('[style*="flex:1"][style*="overflowY"]')?.scrollTo(0,0); }} style={{ flex:2, padding:'12px 26px', borderRadius:10, border:'none', background:C.orange, color:C.white, fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'Sora,sans-serif', transition:'background .2s' }}>Next →</button>}
+                  {step<STEPS.length-1&&<button onClick={()=>goStep(step+1)} style={{ flex:2, padding:'12px 26px', borderRadius:10, border:'none', background:C.orange, color:C.white, fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:'Sora,sans-serif', transition:'background .2s' }}>Next →</button>}
                 </div>
               </div>
             </div>
