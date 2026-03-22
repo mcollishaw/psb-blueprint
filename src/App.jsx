@@ -882,8 +882,7 @@ const Phase3 = ({ d, u }) => {
                 style={{ padding:'6px 14px', borderRadius:7, background:C.orange, color:C.white, border:'none', fontSize:12, fontWeight:700, cursor:'pointer' }}>+ Add User</button>
               <button onClick={()=>{
                 const rows=[['Name','Email','Licence Type','Notes'],...(d.m365Users||[]).map(u=>[u.name,u.email,u.licence,u.notes])];
-                const csv=rows.map(r=>r.map(c=>'"'+(c||'')+'"').join(',')).join('
-');
+                const csv=rows.map(r=>r.map(c=>'"'+(c||'')+'"').join(',')).join('\n');
                 const blob=new Blob([csv],{type:'text/csv'});
                 const a=document.createElement('a');a.href=URL.createObjectURL(blob);
                 a.download=`m365-licences-${(d.practiceName||'practice').replace(/\s+/g,'-')}.csv`;a.click();
