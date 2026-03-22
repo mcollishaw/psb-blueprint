@@ -2002,9 +2002,7 @@ const PasswordGate = ({ onAuth }) => {
   );
 };
 
-export default function App() {
-  const [authed, setAuthed] = useState(() => sessionStorage.getItem(AUTH_KEY) === '1');
-  if(!authed) return <PasswordGate onAuth={()=>setAuthed(true)} />;
+function App() {
   const [step,   setStep]   = useState(0);
   const [locked, setLocked] = useState(null);
   const [saveMsg, setSaveMsg] = useState('');
@@ -2157,4 +2155,11 @@ export default function App() {
       </div>
     </>
   );
+}
+
+// ── Root — keeps auth state isolated from App so password → app transition works ─
+export default function Root() {
+  const [authed, setAuthed] = useState(() => sessionStorage.getItem(AUTH_KEY) === '1');
+  if (!authed) return <PasswordGate onAuth={() => setAuthed(true)} />;
+  return <App />;
 }
