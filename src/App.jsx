@@ -196,20 +196,25 @@ const InfoBox = ({ children, type='info' }) => {
   return <div style={{ background:bg, border:`1.5px solid ${bd}`, borderRadius:9, padding:'10px 14px', marginBottom:14, fontSize:13, color:fc, lineHeight:1.5 }}>{children}</div>;
 };
 
-// Calendar-only date picker — no manual typing, click icon to open
+// Calendar-only date picker — large clickable button that opens native date picker
 const DatePicker = ({ value, onChange, placeholder='Select date…' }) => {
   const ref = useRef(null);
   const fmt = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-AU',{ weekday:'short', day:'numeric', month:'short', year:'numeric' }) : '';
+  const open = () => {
+    if(ref.current) {
+      try { ref.current.showPicker(); } catch(e) { ref.current.focus(); ref.current.click(); }
+    }
+  };
   return (
-    <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
-      <div onClick={()=>ref.current?.showPicker?.() || ref.current?.focus()}
-        style={{ flex:1, padding:'10px 14px', paddingRight:40, fontSize:14, border:`1.5px solid ${C.border}`, borderRadius:9, background:C.surfaceHi, color:value?C.textPrimary:C.textMuted, cursor:'pointer', userSelect:'none', minHeight:42 }}>
-        {value ? fmt(value) : <span style={{color:'rgba(255,255,255,.25)'}}>{placeholder}</span>}
-      </div>
-      <button type="button" onClick={()=>ref.current?.showPicker?.() || ref.current?.focus()}
-        style={{ position:'absolute', right:10, background:'none', border:'none', cursor:'pointer', color:C.orange, fontSize:18, padding:0, lineHeight:1 }}>📅</button>
+    <div style={{ position:'relative' }}>
+      <button type="button" onClick={open}
+        style={{ width:'100%', padding:'12px 16px', fontSize:14, border:`1.5px solid ${value?C.orange:C.border}`, borderRadius:9, background:C.surfaceHi, color:value?C.textPrimary:'rgba(255,255,255,.3)', cursor:'pointer', textAlign:'left', display:'flex', justifyContent:'space-between', alignItems:'center', fontFamily:'inherit' }}>
+        <span>{value ? fmt(value) : placeholder}</span>
+        <span style={{fontSize:20,lineHeight:1}}>📅</span>
+      </button>
       <input ref={ref} type="date" value={value||''} onChange={e=>onChange(e.target.value)}
-        style={{ position:'absolute', opacity:0, width:'100%', height:'100%', top:0, left:0, cursor:'pointer' }} />
+        style={{ position:'absolute', opacity:0, width:'1px', height:'1px', top:0, left:0, pointerEvents:'none' }} />
+      {value && <button type="button" onClick={()=>onChange('')} style={{position:'absolute',right:44,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',color:'rgba(255,255,255,.3)',cursor:'pointer',fontSize:16,padding:'0 4px'}}>×</button>}
     </div>
   );
 };
@@ -631,6 +636,8 @@ const Phase3 = ({ d, u }) => {
   const newDevices = rooms.filter(r=>!r.existingPC || r.replacePC).reduce((a,r)=>a+n(r.qty),0);
   const networkingHrs = (d.switchType||d.wifiAPs||d.firewall||d.failover) ? 2 : 0;
   const cameraHrs = d.cameras ? (n(d.cameraCount)*0.25) : 0;
+  const totalHandsets = (d.handsets||[]).reduce((a,h)=>a+n(h.qty),0) + (d.cordless||[]).reduce((a,h)=>a+n(h.qty),0);
+  const phoneHrs = totalHandsets > 0 ? 2 + Math.max(0, totalHandsets-4) * 0.25 : 0;
   const psHrs  = (newDevices * 2.5) + networkingHrs + cameraHrs;
   const notReq = d.q1req === false;
 
@@ -867,12 +874,7 @@ const Phase3 = ({ d, u }) => {
       )}
 
       <PhaseHeader num={3} title="IT Infrastructure" sub="Room by room, then imaging equipment and networking." />
-      {rooms.length>1&&(
-        <div style={{display:'flex',gap:8,marginBottom:16,justifyContent:'flex-end'}}>
-          <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:true})))} style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊟ Collapse All</button>
-          <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊞ Expand All</button>
-        </div>
-      )}
+
       {notReq && (
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'rgba(239,68,68,.1)', border:`1.5px solid #EF4444`, borderRadius:10, marginBottom:20 }}>
           <span style={{ fontSize:16 }}>⚠️</span>
@@ -1084,29 +1086,7 @@ const Phase3 = ({ d, u }) => {
         {rooms.length>1&&<button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{ padding:'12px 12px', borderRadius:10, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontWeight:600, fontSize:12, cursor:'pointer' }}>⊞ Expand All</button>}
       </div>
 
-      {(totalD>0||d.cameras||d.switchType||d.wifiAPs)&&(
-        <div style={{ background:C.navy, borderRadius:12, padding:'14px 18px', marginBottom:22 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom: (networkingHrs>0||cameraHrs>0)?10:0 }}>
-            {[
-              ['Total Devices', totalD],
-              ['Est. Install Hours', psHrs.toFixed(1)+' hrs'],
-            ].map(([l,v])=>(
-              <div key={l} style={{ background:'rgba(255,255,255,.06)', borderRadius:8, padding:'10px 14px' }}>
-                <div style={{ fontSize:11, color:C.textMuted, marginBottom:3 }}>{l}</div>
-                <div style={{ fontSize:18, fontWeight:700, color:C.orange, fontFamily:'Sora,sans-serif' }}>{v}</div>
-              </div>
-            ))}
-          </div>
-          {(networkingHrs>0||cameraHrs>0||totalD>newDevices)&&(
-            <div style={{fontSize:11,color:C.textMuted,lineHeight:1.8}}>
-              {newDevices>0&&<div>• Devices: {newDevices} × 2.5 hrs = {(newDevices*2.5).toFixed(1)} hrs</div>}
-              {networkingHrs>0&&<div>• Networking setup: 2.0 hrs</div>}
-              {cameraHrs>0&&<div>• Cameras: {n(d.cameraCount)} × 15 min = {cameraHrs.toFixed(1)} hrs</div>}
-              {totalD>newDevices&&<div>• {totalD-newDevices} existing device{totalD-newDevices!==1?'s':''} excluded</div>}
-            </div>
-          )}
-        </div>
-      )}
+
 
       {/* Imaging Equipment */}
       <Divider label="Imaging Equipment & Database Requirements" />
@@ -1428,6 +1408,28 @@ const Phase3 = ({ d, u }) => {
 
       {/* PS */}
       <Divider label="Professional Services — Quote 1" />
+      {(totalD>0||d.cameras||d.switchType||d.wifiAPs||phoneHrs>0)&&(
+        <div style={{ background:C.navy, borderRadius:12, padding:'14px 18px', marginBottom:16 }}>
+          <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:13, color:C.textPrimary, marginBottom:10 }}>Estimated Professional Services Hours</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:10 }}>
+            <div style={{ background:'rgba(255,255,255,.06)', borderRadius:8, padding:'10px 14px' }}>
+              <div style={{ fontSize:11, color:C.textMuted, marginBottom:3 }}>Total Devices</div>
+              <div style={{ fontSize:18, fontWeight:700, color:C.orange, fontFamily:'Sora,sans-serif' }}>{totalD}</div>
+            </div>
+            <div style={{ background:'rgba(255,255,255,.06)', borderRadius:8, padding:'10px 14px' }}>
+              <div style={{ fontSize:11, color:C.textMuted, marginBottom:3 }}>Est. Install Hours</div>
+              <div style={{ fontSize:18, fontWeight:700, color:C.orange, fontFamily:'Sora,sans-serif' }}>{(psHrs+phoneHrs).toFixed(1)} hrs</div>
+            </div>
+          </div>
+          <div style={{fontSize:11,color:C.textMuted,lineHeight:1.9}}>
+            {newDevices>0&&<div>• Devices: {newDevices} × 2.5 hrs = {(newDevices*2.5).toFixed(1)} hrs</div>}
+            {networkingHrs>0&&<div>• Networking setup: 2.0 hrs</div>}
+            {cameraHrs>0&&<div>• Cameras: {n(d.cameraCount)} × 15 min = {cameraHrs.toFixed(1)} hrs</div>}
+            {phoneHrs>0&&<div>• Phone system: 2 hrs base{totalHandsets>4?` + ${totalHandsets-4} extra handsets × 15 min = ${phoneHrs.toFixed(1)} hrs`:` (${totalHandsets} handset${totalHandsets!==1?'s':''} included)`}</div>}
+            {totalD>newDevices&&<div>• {totalD-newDevices} existing device{totalD-newDevices!==1?'s':''} excluded from install time</div>}
+          </div>
+        </div>
+      )}
       <InfoBox type="info">Auto-calculated at 2.5 hrs per device. Adjust if complexity warrants it.</InfoBox>
       <Row>
         <Field label="Installation Hours" hint={`Auto: ${psHrs.toFixed(1)} hrs (${totalD} devices × 2.5)`}>
@@ -2276,9 +2278,9 @@ ${d.notes?`MEETING NOTES\n${'─'.repeat(40)}\n${d.notes}`:''}`}
               {internalSent && <InfoBox type="info">✅ Internal summary sent to {d.internalTeamEmail}</InfoBox>}
               <div style={{ display:'flex', gap:10 }}>
                 <button onClick={()=>{
-                  const el=document.createElement('textarea');
-                  el.value=document.querySelector('.psb-internal-summary')?.textContent||'';
-                  navigator.clipboard.writeText(d.internalTeamEmail);
+                  const el = document.querySelector('.psb-internal-summary');
+                  const text = el ? el.innerText||el.textContent||'' : '';
+                  navigator.clipboard.writeText(text);
                 }} style={{ flex:1, padding:'10px', borderRadius:8, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontSize:13, fontWeight:600, cursor:'pointer' }}>
                   Copy Summary
                 </button>
@@ -2291,104 +2293,116 @@ ${d.notes?`MEETING NOTES\n${'─'.repeat(40)}\n${d.notes}`:''}`}
                       const ejs=await loadEmailJS();
                       const autoEP=rooms.reduce((a,r)=>a+n(r.qty),0);
                       const ep=n(d.endpoints)||autoEP;
-                      const fmtD = s => s?new Date(s+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
+                      const fmtD=s=>s?new Date(s+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
+
+                      // Upload a file (base64 data URL or plain text) to file.io, returns link or null
+                      const uploadFile = async(content, filename, mimeType='application/octet-stream') => {
+                        try {
+                          let blob;
+                          if(typeof content === 'string' && content.startsWith('data:')) {
+                            // base64 data URL → Blob
+                            const arr = content.split(','), mime = arr[0].match(/:(.*?);/)[1];
+                            const bStr = atob(arr[1]);
+                            const u8 = new Uint8Array(bStr.length);
+                            for(let i=0;i<bStr.length;i++) u8[i]=bStr.charCodeAt(i);
+                            blob = new Blob([u8],{type:mime});
+                          } else {
+                            blob = new Blob([content],{type:mimeType});
+                          }
+                          const fd = new FormData();
+                          fd.append('file', blob, filename);
+                          const r = await fetch('https://file.io/?expires=14d',{method:'POST',body:fd});
+                          const j = await r.json();
+                          return j.success ? j.link : null;
+                        } catch(e){ return null; }
+                      };
+
+                      const slug=(d.practiceName||'draft').replace(/\s+/g,'-');
+                      const dt=new Date().toISOString().slice(0,10);
+
+                      // Build full summary text
                       const fullSummary = [
-`PRACTICE SUCCESS BLUEPRINT — INTERNAL BRIEF`,
-`${'═'.repeat(60)}`,
+`PRACTICE SUCCESS BLUEPRINT — INTERNAL BRIEF`,`${'═'.repeat(60)}`,
 `Practice: ${d.practiceName||'—'} | ${[d.suburb,d.state].filter(Boolean).join(', ')||'—'}`,
 `${d.practiceType==='new'?`Opening: ${fmtD(d.openingDate)} | Fitout: ${fmtD(d.fitoutDate)}`:`Go-Live: ${fmtD(d.goLiveDate)}`}`,
-`PMS: ${d.pms||(d.pmsOther||'—')} | Finance: ${d.financeProvider||'None'}`,
+`PMS: ${d.pms||(d.pmsOther||'—')} | Finance: ${d.financeProvider||'None'} | Chairs: ${d.chairs||'—'}`,
 `Imaging SW: ${(d.imagingSw||[]).join(', ')||'—'}`,
 `Sales Rep: ${d.salesRep||'—'} | Meeting: ${fmtD(d.meetingDate)}`,
-`Contact: ${d.contactName||'—'} | ${d.contactEmail||'—'} | Chairs: ${d.chairs||'—'}`,
-``,
-`SOLUTIONS IN SCOPE`,
-`${'─'.repeat(40)}`,
-[d.q1req!==false&&`✅ S1 — Hardware${d.q1url?'\n   '+d.q1url:''}`,d.q2req!==false&&`✅ S2 — Telecoms${d.q2url?'\n   '+d.q2url:''}`,d.q3req!==false&&`✅ S3 — MSA${d.q3url?'\n   '+d.q3url:''}`].filter(Boolean).join('\n'),
-``,
-`IT INFRASTRUCTURE`,
-`${'─'.repeat(40)}`,
-rooms.map(r=>{const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];return r.existingPC?`${r.name||'Room'}: EXISTING PC — ${r.pcBrand||'TBC'} | Age: ${r.pcAge||'?'} yrs | CPU: ${r.pcCpu||'?'} | RAM: ${r.pcRam||'?'} | Storage: ${r.pcStorage||'?'}${r.pcHasGpu?' | GPU: '+r.pcGpuModel:''}` :`${r.name||'Room'}: ${dev.label} × ${n(r.qty)}${r.database?' [RAID]':''}${r.monitor&&r.monitor!=='No Monitor'?' · '+r.monitor:''}${r.kbMouse?' · KB+Mouse':''}`;}).join('\n')||'No rooms',
-`Switch: ${d.switchType||'—'} | APs: ${d.wifiAPs||'0'}× (${d.apMount||'TBC'} mount) | Existing network: ${d.existingNetwork?'Yes':'No'}`,
-`Firewall: ${d.firewall?'UDM Pro':'None'} | 4G Failover: ${d.failover?'Teltonika TRB140':'None'}`,
-d.cameras?`Cameras: ${d.cameraCount||'?'}× · NVR: ${d.nvrStorage||'TBC'}`:'Cameras: None',
-`M365: ${[d.m365Premium&&`${d.m365Premium}× Business Premium`,d.m365F1&&`${d.m365F1}× F1`].filter(Boolean).join(', ')||'—'}`,
-d.existingM365&&(d.m365Users||[]).length>0?`M365 Users (${(d.m365Users||[]).length}): `+(d.m365Users||[]).map(u=>`${u.name||'?'} (${u.licence||u.licenceOther||'?'})`).join(', '):'',
-``,
-`IMAGING EQUIPMENT`,
-`${'─'.repeat(40)}`,
-(d.intraoralScanners||[]).length>0?(d.intraoralScanners||[]).map((s,i)=>`Intraoral ${i+1}: ${s.model||'TBC'} | SW: ${s.software||'—'}${s.installed?' [EXISTING]':''}${s.dedicated?' [dedicated PC]':''}${s.database?' [RAID — DB: '+s.dbDeviceName+']':''}`).join('\n'):'No intraoral scanners',
-(d.xrayMachines||[]).length>0?(d.xrayMachines||[]).map((x,i)=>`X-ray ${i+1}: ${x.model||'TBC'} (${x.type||'TBC'}) | SW: ${x.software||'—'} | ${x.timing||'timing TBC'}${x.installed?' [EXISTING]':''}${x.database?' [RAID — DB: '+x.dbDeviceName+']':''}`).join('\n'):'No X-ray machines',
-(d.otherImaging||[]).map((o,i)=>`Other ${i+1}: ${o.desc||'TBC'}`).join('\n'),
-``,
-`EXTERNAL VENDORS`,
-`${'─'.repeat(40)}`,
-(d.vendors||[]).length>0?(d.vendors||[]).map(v=>`${v.type||(v.customType||'Vendor')}: ${v.company||'—'} | ${v.contact||'—'} | ${v.phone||'—'} | ${v.email||'—'} | Install: ${v.installResp||'TBD'}`).join('\n'):'None captured',
-``,
-`TELECOMS`,
-`${'─'.repeat(40)}`,
-`Internet: ${d.internetType==='nbn'?'Business NBN '+d.nbnTier:d.internetType==='fibre'?'Private Fibre '+d.fibreSpeed:d.internetType||'TBC'} | 4G SIM: ${d.sim4g?'Yes':'No'}`,
-`VoIP: ${d.voip?`${d.voipLicences||'?'} licences${d.porting?' · porting required':''}`:'No'}`,
-d.callFlowType?`Call flow: ${d.callFlowType==='default'?'Default dental':'Custom'} | Greeting: ${d.callFlowGreeting||'—'}`:'',
-[...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Handset × ${h.qty}`),
- ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Headset × ${h.qty}`),
- ...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Cordless × ${h.qty}`)].join(' | ')||'No hardware',
-``,
-`MANAGED SERVICES`,
-`${'─'.repeat(40)}`,
-`TotalCare MSA: ${ep} endpoints | Advanced Cyber: ${d.advancedCyber?'Yes':'No'}`,
-`BCDR: ${d.datto?`Datto Siris${d.dattoDataVolume?' · '+d.dattoDataVolume:''}${d.dattoDeviceCount?' · '+d.dattoDeviceCount+' devices':''}` :'No'} | Cloud Backup: ${d.cloudBackup?'Yes':'No'}`,
-d.cyberInsurer?`Cyber Insurance: ${d.cyberInsurer}${d.cyberPolicyNumber?' | '+d.cyberPolicyNumber:''}${d.cyberExpiry?' | Expires: '+fmtD(d.cyberExpiry):''}` :'',
-``,
-d.notes?`MEETING NOTES
+`Contact: ${d.contactName||'—'} | ${d.contactEmail||'—'}`,``,
+`SOLUTIONS IN SCOPE`,`${'─'.repeat(40)}`,
+[d.q1req!==false&&`S1 Hardware${d.q1url?' — '+d.q1url:''}`,d.q2req!==false&&`S2 Telecoms${d.q2url?' — '+d.q2url:''}`,d.q3req!==false&&`S3 MSA${d.q3url?' — '+d.q3url:''}`].filter(Boolean).join(' | '),``,
+d.practiceType==='existing'&&d.existingIT?[`EXISTING IT PROVIDER`,`${'─'.repeat(40)}`,`Company: ${d.existingITCompany||'—'} | Type: ${d.existingITType||'—'}`,`Contact: ${[d.existingITContact,d.existingITPhone,d.existingITEmail].filter(Boolean).join(' | ')||'—'}`,`Expiry: ${d.existingITExpiry||'—'}`,`Manages: ${[d.existingITManagesDevices!==false&&'Devices',d.existingITManagesEmail!==false&&'Email',d.existingITManagesPhones!==false&&'Phones',d.existingITManagesInternet!==false&&'Internet',d.existingITManagesSecurity!==false&&'Security'].filter(Boolean).join(', ')||'—'}`,``].join('
+'):null,
+`IT INFRASTRUCTURE`,`${'─'.repeat(40)}`,
+rooms.map(r=>{const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];const base=r.deviceName&&r.deviceName!==r.name?`${r.name} (${r.deviceName})`:(r.name||'Room');return r.existingPC?`${base}: EXISTING — ${r.pcBrand||'TBC'} | ${r.pcAge||'?'}yr | ${r.pcCpu||'?'} | ${r.pcRam||'?'} | OS: ${r.pcOs||'?'}${r.replacePC?' → REPLACE with '+dev.label:''}` :`${base}: NEW ${dev.label}${r.monitor&&r.monitor!=='No Monitor'?' + '+r.monitor:''}${r.kbMouse?' + KB/Mouse':''}${r.database?' + RAID':''}`;}).join('
+')||'No rooms',
+d.switchType||d.wifiAPs||d.firewall||d.failover?`Network: Switch=${d.switchType||'—'} | APs=${d.wifiAPs||'0'}× | Firewall=${d.firewall?'UDM Pro':'—'} | 4G=${d.failover?'TRB140':'—'}`:null,
+d.cameras?`Cameras: ${d.cameraCount||'?'}× | NVR: ${d.nvrStorage||'TBC'}`:null,
+d.m365Premium||d.m365F1?`M365: ${[d.m365Premium&&d.m365Premium+'× Business Premium',d.m365F1&&d.m365F1+'× F1'].filter(Boolean).join(', ')}`:null,``,
+`IMAGING EQUIPMENT`,`${'─'.repeat(40)}`,
+...(d.intraoralScanners||[]).map((s,i)=>`Intraoral ${i+1}: ${s.model||'TBC'} | SW: ${s.software||'—'}${s.dedicated?' [dedicated PC]':''}${s.database?' [RAID→'+s.dbDeviceName+']':''}`),
+...(d.xrayMachines||[]).map((x,i)=>`X-ray ${i+1}: ${x.model||'TBC'} (${x.type||'?'}) | SW: ${x.software||'—'} | ${x.timing||'?'}${x.acquisitionPc?' [Acq: '+x.acquisitionPc+']':''}${x.database?' [RAID→'+x.dbDeviceName+']':''}`),
+...(d.otherImaging||[]).map((o,i)=>`Other ${i+1}: ${o.desc||'TBC'}`),
+(d.intraoralScanners||[]).length===0&&(d.xrayMachines||[]).length===0?'No imaging captured':null,``,
+`EXTERNAL VENDORS`,`${'─'.repeat(40)}`,
+...(d.vendors||[]).map(v=>`${v.type||(v.customType||'Vendor')}: ${v.company||'—'} | ${[v.contact,v.phone,v.email].filter(Boolean).join(' | ')||'—'} | Install: ${v.installResp||'TBD'}`),
+(d.vendors||[]).length===0?'None captured':null,``,
+`TELECOMS`,`${'─'.repeat(40)}`,
+`Internet: ${d.internetType==='nbn'?'NBN '+d.nbnTier:d.internetType||'TBC'} | 4G SIM: ${d.sim4g?'Yes':'No'}`,
+d.voip?`VoIP: ${d.voipLicences||'?'} licences${d.porting?' | Porting: '+(d.portingNumbers||'TBC')+' via '+(d.portingCarrier||'TBC'):''}`:null,
+...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Handset ×${h.qty}`),
+...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Cordless ×${h.qty}`),
+...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Headset ×${h.qty}`),``,
+`MANAGED SERVICES`,`${'─'.repeat(40)}`,
+`MSA: ${d.msaSelected!==false?ep+' endpoints':'NOT SELECTED'}`,
+`Cyber: ${d.advancedCyber?'Full Suite':([d.cyberSoc&&'SOC',d.cyberPam&&'PAM',d.cyberDwm&&'DWM',d.cyberPwdMgr&&'Password Mgr'].filter(Boolean).join(' + ')||'None selected')}`,
+...(d.backupDevices||[]).map(b=>`Backup — ${b.name||'?'}: ${b.backupType||'TBC'} | ${b.dataVol||'?'} | RPO:${b.rpo||'?'} RTO:${b.rto||'?'} Retention:${b.retention||'?'}`),
+d.cyberInsurer?`Cyber Insurance: ${d.cyberInsurer}${d.cyberPolicyNumber?' #'+d.cyberPolicyNumber:''}${d.cyberExpiry?' exp '+fmtD(d.cyberExpiry):''}`:null,``,
+d.actionPoints?`ACTION POINTS
 ${'─'.repeat(40)}
-${d.notes}`:'',
-d.actionPoints?`
-ACTION POINTS
+${d.actionPoints}`:null,
+d.followUps?`FOLLOW-UPS
 ${'─'.repeat(40)}
-${d.actionPoints}`:'',
-d.followUps?`
-FOLLOW-UPS REQUIRED
+${d.followUps}`:null,
+d.risks?`RISKS & NOTES
 ${'─'.repeat(40)}
-${d.followUps}`:'',
-d.risks?`
-RISKS & NOTES
+${d.risks}`:null,
+                      ].filter(v=>v!==false&&v!==null&&v!==undefined&&v!=='').join('
+');
+
+                      // Upload JSON blueprint export
+                      const jsonStr=JSON.stringify({...d,_exportDate:new Date().toISOString()},null,2);
+                      const jsonLink=await uploadFile(jsonStr,`blueprint-${slug}-${dt}.json`,'application/json');
+
+                      // Upload any images/files captured during the session
+                      const uploads=[];
+                      if(d.floorPlanImage){const l=await uploadFile(d.floorPlanImage,`floor-plan-${slug}.png`);if(l)uploads.push(`Floor Plan: ${l}`);}
+                      if(d.cameraLayoutImage){const l=await uploadFile(d.cameraLayoutImage,`camera-layout-${slug}.png`);if(l)uploads.push(`Camera Layout: ${l}`);}
+                      if(d.callFlowImage){const l=await uploadFile(d.callFlowImage,`call-flow-diagram-${slug}.png`);if(l)uploads.push(`Call Flow Diagram: ${l}`);}
+                      for(let i=0;i<(d.callFlowAudio||[]).length;i++){const a=d.callFlowAudio[i];const l=await uploadFile(a.data,a.name||`audio-${i+1}.mp3`);if(l)uploads.push(`Call Flow Audio "${a.name}": ${l}`);}
+
+                      const fileSection=`
+${'═'.repeat(60)}
+ATTACHED FILES (links expire 14 days)
 ${'─'.repeat(40)}
-${d.risks}`:'',
-                      ].filter(v=>v!==false&&v!==null&&v!==undefined&&v!=='').join('\n');
+${jsonLink?`📎 Blueprint JSON (re-import to resume): ${jsonLink}`:'⚠️ JSON upload failed'}
+${uploads.join('
+')}`;
 
                       await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
-                        to_email: d.internalTeamEmail,
-                        practice: d.practiceName||'New Practice',
-                        sales_rep: d.salesRep||'—',
-                        go_live: d.practiceType==='new'?(fmtD(d.openingDate)||'TBD'):(fmtD(d.goLiveDate)||'TBD'),
-                        practice_type: d.practiceType==='new'?'New build':'Existing / fit-out',
-                        summary: fullSummary.slice(0, 45000),
+                        to_email:d.internalTeamEmail,
+                        practice:d.practiceName||'New Practice',
+                        sales_rep:d.salesRep||'—',
+                        go_live:d.practiceType==='new'?(fmtD(d.openingDate)||'TBD'):(fmtD(d.goLiveDate)||'TBD'),
+                        practice_type:d.practiceType==='new'?'New build':'Existing / fit-out',
+                        summary:(fullSummary+fileSection).slice(0,45000),
                       });
-                      // Also trigger JSON export automatically
-                      await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
-                        to_email: d.internalTeamEmail,
-                        practice: d.practiceName||'New Practice',
-                        sales_rep: d.salesRep||'—',
-                        go_live: d.practiceType==='new'?(fmtD(d.openingDate)||'TBD'):(fmtD(d.goLiveDate)||'TBD'),
-                        practice_type: d.practiceType==='new'?'New build':'Existing / fit-out',
-                        summary: fullSummary.slice(0,45000),
-                      });
-                      const _ej = JSON.stringify({...d,_exportDate:new Date().toISOString()},null,2);
-                      const _eb = new Blob([_ej],{type:'application/json'});
-                      const _ea = document.createElement('a'); _ea.href=URL.createObjectURL(_eb);
-                      _ea.download=`blueprint-${(d.practiceName||'draft').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`;
-                      _ea.click();
-                      const a = document.createElement('a');
-                      a.href = URL.createObjectURL(blob);
-                      a.download = `blueprint-${(d.practiceName||'draft').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`;
-                      a.click();
                       setInternalSent(true);
                     }catch(e){console.error(e);alert('Failed to send: '+(e.message||e.text||JSON.stringify(e)));}
                     setInternalSending(false);
                   }}
                   style={{ flex:2, padding:'10px', borderRadius:8, background:internalSent?C.green:C.navyMid, color:C.white, border:'none', fontSize:13, fontWeight:700, cursor:!d.internalTeamEmail||internalSending||internalSent?'default':'pointer', opacity:!d.internalTeamEmail?.6:1, fontFamily:'Sora,sans-serif' }}>
-                  {internalSent?'✓ Sent':internalSending?'Sending…':'Send to Team'}
+                  {internalSent?'✓ Sent':internalSending?'Uploading files & sending…':'Send to Team'}
                 </button>
               </div>
             </div>
@@ -2427,6 +2441,20 @@ ${d.risks}`:'',
           ))}
         </div>
       </div>
+
+      {/* Existing IT Provider summary */}
+      {d.practiceType==='existing' && d.existingIT && d.existingITCompany && (
+        <SumSection title="Existing IT Provider">
+          <SumRow label="Company" value={d.existingITCompany||null} />
+          <SumRow label="Contract Type" value={d.existingITType||null} />
+          <SumRow label="Contact" value={[d.existingITContact,d.existingITPhone].filter(Boolean).join(' · ')||null} />
+          <SumRow label="Contract Expiry" value={d.existingITExpiry||null} />
+          <SumRow label="Manages" value={[d.existingITManagesDevices!==false&&'Devices',d.existingITManagesEmail!==false&&'Email',d.existingITManagesPhones!==false&&'Phones',d.existingITManagesInternet!==false&&'Internet',d.existingITManagesSecurity!==false&&'Security'].filter(Boolean).join(', ')||null} />
+          {[{k:'takeoverDevices',l:'Devices'},{k:'takeoverEmail',l:'Email'},{k:'takeoverPhones',l:'Phones'},{k:'takeoverInternet',l:'Internet'},{k:'takeoverSecurity',l:'Security'}].filter(t=>d[t.k]).length>0&&(
+            <SumRow label="32 Byte taking over" value={[{k:'takeoverDevices',l:'Devices'},{k:'takeoverEmail',l:'Email'},{k:'takeoverPhones',l:'Phones'},{k:'takeoverInternet',l:'Internet'},{k:'takeoverSecurity',l:'Security'}].filter(t=>d[t.k]).map(t=>t.l).join(', ')} />
+          )}
+        </SumSection>
+      )}
 
       {/* Summary sections */}
       {d.q1req !== false && (
@@ -2519,7 +2547,16 @@ ${d.risks}`:'',
 
       {(d.vendors||[]).length>0&&(
         <SumSection title="Project Vendors">
-          {(d.vendors||[]).map(v=><SumRow key={v.id} label={v.type||'Vendor'} value={[v.company,v.contact,v.phone].filter(Boolean).join(' · ')||null} />)}
+          {(d.vendors||[]).map(v=>(
+            <div key={v.id} style={{padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                <span style={{fontSize:13,fontWeight:600,color:C.textSecondary}}>{v.type||(v.customType||'Vendor')}</span>
+                {v.installResp&&<span style={{fontSize:11,fontWeight:700,color:v.installResp==='32 Byte'?C.green:v.installResp==='Vendor'?C.amber:C.textMuted,background:`${v.installResp==='32 Byte'?C.green:v.installResp==='Vendor'?C.amber:'#64748B'}22`,padding:'1px 7px',borderRadius:10}}>Install: {v.installResp}</span>}
+              </div>
+              <div style={{fontSize:13,color:C.textPrimary,fontWeight:600,marginTop:2}}>{v.company||'—'}</div>
+              {(v.contact||v.phone||v.email)&&<div style={{fontSize:12,color:C.textMuted,marginTop:1}}>{[v.contact,v.phone,v.email].filter(Boolean).join(' · ')}</div>}
+            </div>
+          ))}
         </SumSection>
       )}
 
