@@ -718,7 +718,7 @@ const Phase3 = ({ d, u }) => {
       const cpuClean = (dev.cpu||'').replace(/Intel\(R\)|Core\(TM\)|CPU|AMD|@/g,'').replace(/\s+/g,' ').trim();
       return {
         id: uid(),
-        name: dev.name,
+        name: '',
         deviceName: dev.name,
         deviceType,
         qty: 1,
@@ -867,6 +867,12 @@ const Phase3 = ({ d, u }) => {
       )}
 
       <PhaseHeader num={3} title="IT Infrastructure" sub="Room by room, then imaging equipment and networking." />
+      {rooms.length>1&&(
+        <div style={{display:'flex',gap:8,marginBottom:16,justifyContent:'flex-end'}}>
+          <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:true})))} style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊟ Collapse All</button>
+          <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{padding:'6px 12px',borderRadius:8,border:`1px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊞ Expand All</button>
+        </div>
+      )}
       {notReq && (
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'rgba(239,68,68,.1)', border:`1.5px solid #EF4444`, borderRadius:10, marginBottom:20 }}>
           <span style={{ fontSize:16 }}>⚠️</span>
@@ -879,6 +885,12 @@ const Phase3 = ({ d, u }) => {
       )}
 
       {/* Room cards */}
+      {rooms.length>1&&(
+        <div style={{display:'flex',gap:8,marginBottom:12,justifyContent:'flex-end'}}>
+          <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:true})))} style={{padding:'6px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊟ Collapse All</button>
+          <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{padding:'6px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊞ Expand All</button>
+        </div>
+      )}
       {rooms.length===0&&<div style={{ textAlign:'center', padding:'28px 0', color:C.textMuted, fontSize:14 }}>No rooms yet. Start with reception.</div>}
       {rooms.map((r,i)=>{
         const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
@@ -1183,6 +1195,12 @@ const Phase3 = ({ d, u }) => {
                   : <Input value={xr.dbDeviceName||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,dbDeviceName:v}:x))} placeholder="e.g. XRAY-PC-01, SERVER-01" />}
               </Field>
             )}
+            <Field label="Acquisition / Capture PC" tight hint="PC connected to this machine for image capture">
+              {(d.rooms||[]).length>0
+                ? <Select value={xr.acquisitionPc||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,acquisitionPc:v}:x))}
+                    options={[...(d.rooms||[]).map(r=>r.deviceName||r.name).filter(Boolean), 'Standalone / embedded']} placeholder="Select acquisition PC…" />
+                : <Input value={xr.acquisitionPc||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,acquisitionPc:v}:x))} placeholder="e.g. SURGERY1-PC, standalone" />}
+            </Field>
             <Field label="Notes" tight><Input value={xr.notes||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,notes:v}:x))} placeholder="Lead lining, room setup, vendor install coordination…" /></Field>
           </Card>
         ))}
@@ -2012,18 +2030,18 @@ Return only the email text, no subject line, no preamble.`;
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body:JSON.stringify({
-          model:'claude-sonnet-4-20250514',
-          max_tokens:1000,
-          messages:[{ role:'user', content:buildPrompt() }]
-        })
+        headers:{ 'Content-Type':'application/json', 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+        body:JSON.stringify({ model:'claude-sonnet-4-20250514', max_tokens:1000, messages:[{ role:'user', content:buildPrompt() }] })
       });
+      if(!res.ok) throw new Error(`API error ${res.status}`);
       const data = await res.json();
       const text = (data.content||[]).map(c=>c.text||'').join('\n');
-      setEmail(text);
+      if(text) { setEmail(text); setLoading(false); return; }
+      throw new Error('Empty response');
     } catch(e) {
-      setEmail('Error generating email. Please try again.');
+      const fmtDate = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'long',year:'numeric'}) : null;
+      const dateLabel = d.practiceType==='new' ? fmtDate(d.openingDate) : fmtDate(d.goLiveDate);
+      setEmail(`Hi ${d.contactName||'there'},\n\nThank you for taking the time to meet with us today to discuss the technology requirements for ${d.practiceName||'your practice'}.\n\nFollowing our Practice Success Blueprint meeting, I wanted to reach out with a summary of what we covered and the next steps.\n\n${dateLabel ? `We have noted your ${d.practiceType==='new'?'target opening date':'go-live date'} of ${dateLabel} and will be working to ensure everything is in place well ahead of time.` : 'We will be in touch shortly with a proposed timeline.'}\n\nYour formal quotes will follow shortly. In the meantime, please don't hesitate to reach out if you have any questions.\n\nWarm regards,\n${d.salesRep||'The 32 Byte Team'}\n32 Byte — Dental IT Specialists`);
     }
     setLoading(false);
   };
@@ -2339,22 +2357,34 @@ ${'─'.repeat(40)}
 ${d.risks}`:'',
                       ].filter(v=>v!==false&&v!==null&&v!==undefined&&v!=='').join('\n');
 
-                      // Build base64 JSON attachment
-                      const exportJson = JSON.stringify({...d, _exportDate: new Date().toISOString()}, null, 2);
-                      const b64 = btoa(unescape(encodeURIComponent(exportJson)));
-
                       await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
                         to_email: d.internalTeamEmail,
                         practice: d.practiceName||'New Practice',
                         sales_rep: d.salesRep||'—',
                         go_live: d.practiceType==='new'?(fmtD(d.openingDate)||'TBD'):(fmtD(d.goLiveDate)||'TBD'),
                         practice_type: d.practiceType==='new'?'New build':'Existing / fit-out',
-                        summary: fullSummary,
-                        export_filename: `blueprint-${(d.practiceName||'draft').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`,
-                        export_data: b64,
+                        summary: fullSummary.slice(0, 45000),
                       });
+                      // Also trigger JSON export automatically
+                      await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
+                        to_email: d.internalTeamEmail,
+                        practice: d.practiceName||'New Practice',
+                        sales_rep: d.salesRep||'—',
+                        go_live: d.practiceType==='new'?(fmtD(d.openingDate)||'TBD'):(fmtD(d.goLiveDate)||'TBD'),
+                        practice_type: d.practiceType==='new'?'New build':'Existing / fit-out',
+                        summary: fullSummary.slice(0,45000),
+                      });
+                      const _ej = JSON.stringify({...d,_exportDate:new Date().toISOString()},null,2);
+                      const _eb = new Blob([_ej],{type:'application/json'});
+                      const _ea = document.createElement('a'); _ea.href=URL.createObjectURL(_eb);
+                      _ea.download=`blueprint-${(d.practiceName||'draft').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`;
+                      _ea.click();
+                      const a = document.createElement('a');
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `blueprint-${(d.practiceName||'draft').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`;
+                      a.click();
                       setInternalSent(true);
-                    }catch(e){console.error(e);alert('Failed to send: '+e.message);}
+                    }catch(e){console.error(e);alert('Failed to send: '+(e.message||e.text||JSON.stringify(e)));}
                     setInternalSending(false);
                   }}
                   style={{ flex:2, padding:'10px', borderRadius:8, background:internalSent?C.green:C.navyMid, color:C.white, border:'none', fontSize:13, fontWeight:700, cursor:!d.internalTeamEmail||internalSending||internalSent?'default':'pointer', opacity:!d.internalTeamEmail?.6:1, fontFamily:'Sora,sans-serif' }}>
@@ -2413,26 +2443,38 @@ ${d.risks}`:'',
                 const age = parseInt(r.pcAge)||inferA||0;
                 const statusColor = isReplace?C.orange:isExist&&age>=5?C.red:isExist&&age>=3?C.amber:C.green;
                 const statusLabel = isReplace?'Replace':isExist&&age>=5?'EOL':isExist&&age>=3?'O/W':'OK';
+                const oldSpecs = [r.pcCpu&&r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@/g,'').replace(/\s+/g,' ').trim(),r.pcRam,r.pcStorage].filter(Boolean).join(' · ');
+                const newSpecs = [r.monitor&&r.monitor!=='No Monitor'&&r.monitor,r.kbMouse&&'KB+Mouse',r.database&&'RAID'].filter(Boolean).join(' · ')||'Standard config';
                 return (
-                  <div key={r.id} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',padding:'8px 10px',gap:8,borderTop:ri>0?`1px solid ${C.border}`:'none',background:ri%2===0?'transparent':'rgba(255,255,255,.02)'}}>
-                    <div style={{fontSize:13,fontWeight:600,color:C.textPrimary}}>{r.name||'Room'}</div>
-                    <div style={{fontSize:12,color:C.textSecondary}}>
-                      {isExist&&!isReplace&&<span style={{color:'#94A3B8'}}>{r.pcBrand||'Existing PC'}</span>}
-                      {isReplace&&(
-                        <div>
-                          <div style={{color:'#94A3B8',textDecoration:'line-through',fontSize:11}}>{r.pcBrand||'Existing PC'}</div>
-                          <div style={{color:C.orange,fontWeight:600}}>→ {dev.label}</div>
+                  <div key={r.id} style={{borderTop:ri>0?`1px solid ${C.border}`:'none',background:ri%2===0?'transparent':'rgba(255,255,255,.02)'}}>
+                    {/* Standard row */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',padding:'8px 10px',gap:8}}>
+                      <div style={{fontSize:13,fontWeight:600,color:C.textPrimary}}>{r.name||'Room'}{r.deviceName&&r.deviceName!==r.name?<span style={{fontWeight:400,color:C.textMuted,fontSize:11}}> · {r.deviceName}</span>:''}</div>
+                      <div style={{fontSize:12}}>
+                        {isExist&&!isReplace&&<span style={{color:'#94A3B8'}}>{r.pcBrand||'Existing PC'}</span>}
+                        {isReplace&&<span style={{color:C.red,textDecoration:'line-through',fontSize:11}}>{r.pcBrand||'Existing PC'}</span>}
+                        {!isExist&&!isReplace&&<span style={{color:C.green,fontWeight:600}}>{dev.label}{n(r.qty)>1?` ×${r.qty}`:''}</span>}
+                      </div>
+                      <div style={{fontSize:11,color:'#94A3B8',lineHeight:1.5}}>
+                        {isExist||isReplace ? oldSpecs||'—' : newSpecs}
+                      </div>
+                      <div style={{display:'flex',alignItems:'center'}}>
+                        {isExist&&!isReplace&&<span style={{fontSize:11,fontWeight:700,color:statusColor,background:`${statusColor}22`,padding:'2px 8px',borderRadius:20}}>{statusLabel}</span>}
+                        {isReplace&&<span style={{fontSize:11,fontWeight:700,color:C.orange,background:`${C.orange}22`,padding:'2px 8px',borderRadius:20}}>Replace</span>}
+                        {!isExist&&!isReplace&&<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(16,185,129,.15)',padding:'2px 8px',borderRadius:20}}>NEW</span>}
+                      </div>
+                    </div>
+                    {/* Replacement new device row */}
+                    {isReplace&&(
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',padding:'4px 10px 8px',gap:8,background:'rgba(16,185,129,.04)'}}>
+                        <div style={{fontSize:11,color:C.textMuted}}></div>
+                        <div style={{fontSize:12,color:C.green,fontWeight:600}}>→ {dev.label}</div>
+                        <div style={{fontSize:11,color:C.green,lineHeight:1.5}}>{newSpecs}</div>
+                        <div style={{display:'flex',alignItems:'center'}}>
+                          <span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(16,185,129,.15)',padding:'2px 8px',borderRadius:20}}>NEW</span>
                         </div>
-                      )}
-                      {!isExist&&<span>{dev.label}{n(r.qty)>1?` ×${r.qty}`:''}</span>}
-                    </div>
-                    <div style={{fontSize:11,color:'#94A3B8',lineHeight:1.5}}>
-                      {isExist||isReplace?[r.pcCpu&&r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@/g,'').replace(/\s+/g,' ').trim(),r.pcRam,r.pcStorage].filter(Boolean).join(' · ') || '—':
-                        [r.monitor&&r.monitor!=='No Monitor'&&r.monitor,r.kbMouse&&'KB+Mouse',r.database&&'RAID',n(r.qty)>1&&`×${r.qty}`].filter(Boolean).join(' · ')||'Standard'}
-                    </div>
-                    <div style={{display:'flex',alignItems:'center'}}>
-                      <span style={{fontSize:11,fontWeight:700,color:statusColor,background:`${statusColor}22`,padding:'2px 8px',borderRadius:20}}>{isExist?statusLabel:isReplace?'Replace':'New'}</span>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -2523,25 +2565,28 @@ ${d.risks}`:'',
       <Divider label="KQM Quote Links (Internal)" />
       <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
         {[
-          { label:'Solution 1 — Hardware & Infrastructure', url:d.q1url, req:d.q1req },
-          { label:'Solution 2 — Telecommunications',        url:d.q2url, req:d.q2req },
-          { label:'Solution 3 — Managed Services',          url:d.q3url, req:d.q3req },
-        ].filter(q=>q.req!==false).map(({ label, url })=>(
-          <div key={label} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 16px', background:C.surface, border:`1.5px solid ${C.border}`, borderRadius:9 }}>
-            <span style={{ fontSize:13, fontWeight:600, color:C.textPrimary }}>{label}</span>
-            {url
-              ? <a href={url} target="_blank" rel="noreferrer" style={{ fontSize:12, fontWeight:700, color:C.orange, textDecoration:'none', background:C.orangeLight, padding:'4px 12px', borderRadius:6 }}>Open in KQM ↗</a>
-              : <span style={{ fontSize:12, color:C.textMuted, fontStyle:'italic' }}>No URL — add in Solution Setup</span>}
+          { label:'Solution 1 — Hardware & Infrastructure', url:d.q1url, req:d.q1req, uk:'q1url' },
+          { label:'Solution 2 — Telecommunications',        url:d.q2url, req:d.q2req, uk:'q2url' },
+          { label:'Solution 3 — Managed Services',          url:d.q3url, req:d.q3req, uk:'q3url' },
+        ].filter(q=>q.req!==false).map(({ label, url, uk })=>(
+          <div key={label} style={{ padding:'10px 14px', background:C.surfaceHi, border:`1px solid ${url?C.orangeBorder:C.border}`, borderRadius:9 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span style={{ fontSize:13, fontWeight:600, color:C.textPrimary }}>{label}</span>
+              {url && <a href={url} target="_blank" rel="noreferrer" style={{ fontSize:12, fontWeight:700, color:C.orange }}>Open Quote ↗</a>}
+            </div>
+            <input type="url" value={url||''} onChange={e=>u(uk,e.target.value)}
+              placeholder="Paste KQM quote URL here…"
+              style={{width:'100%',padding:'6px 10px',borderRadius:7,background:'rgba(0,0,0,.25)',border:`1px solid ${C.border}`,color:C.textPrimary,fontSize:12,outline:'none',boxSizing:'border-box',marginTop:8}} />
           </div>
         ))}
       </div>
 
-      {/* Incomplete items checker */}
+            {/* Incomplete items checker */}
       {(() => {
         const warnings = [];
         // Imaging DB device names
-        (d.intraoralScanners||[]).forEach((s,i)=>{ if(s.database && !s.dbDeviceName) warnings.push(`Intraoral Scanner ${i+1}: database device name not entered`); });
-        (d.xrayMachines||[]).forEach((x,i)=>{ if(x.database && !x.dbDeviceName) warnings.push(`X-ray Machine ${i+1}: database device name not entered`); });
+        (d.intraoralScanners||[]).forEach((s,i)=>{ if(s.database && !s.dbDeviceName) warnings.push({text:`Intraoral Scanner ${i+1}: database device name not entered`, step:3}); });
+        (d.xrayMachines||[]).forEach((x,i)=>{ if(x.database && !x.dbDeviceName) warnings.push({text:`X-ray Machine ${i+1}: database device name not entered`, step:3}); });
         // Existing IT provider details
         if(d.practiceType==='existing' && d.existingIT) {
           if(!d.existingITCompany) warnings.push({text:'Existing IT provider: company name missing', step:1});
