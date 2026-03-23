@@ -2142,9 +2142,9 @@ Return only the email text, no subject line, no preamble.`;
 
       // Quote buttons
       const quoteBtnsHTML = [
-        d.q1req!==false&&d.q1url&&`<table cellpadding="0" cellspacing="0" style="margin-bottom:10px;width:100%"><tr><td style="background:#fe5a25;border-radius:8px"><a href="${d.q1url}" style="display:block;padding:13px 20px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Helvetica,Arial,sans-serif">Solution 1 &#8212; Hardware &amp; Infrastructure &#8594;</a></td></tr></table>`,
-        d.q2req!==false&&d.q2url&&`<table cellpadding="0" cellspacing="0" style="margin-bottom:10px;width:100%"><tr><td style="background:#fe5a25;border-radius:8px"><a href="${d.q2url}" style="display:block;padding:13px 20px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Helvetica,Arial,sans-serif">Solution 2 &#8212; Telecommunications &#8594;</a></td></tr></table>`,
-        d.q3req!==false&&d.q3url&&`<table cellpadding="0" cellspacing="0" style="margin-bottom:10px;width:100%"><tr><td style="background:#fe5a25;border-radius:8px"><a href="${d.q3url}" style="display:block;padding:13px 20px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Helvetica,Arial,sans-serif">Solution 3 &#8212; Managed Services &#8594;</a></td></tr></table>`,
+        d.q1req!==false&&d.q1url&&`<table cellpadding="0" cellspacing="0" style="margin-bottom:12px;width:100%;border-radius:9px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.12)"><tr><td style="background:#fe5a25;border-radius:9px"><a href="${d.q1url}" style="display:block;padding:15px 20px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Helvetica,Arial,sans-serif;border-radius:9px">&#128196; Solution 1 &#8212; Hardware &amp; Infrastructure &nbsp; &#8594;</a></td></tr></table>`,
+        d.q2req!==false&&d.q2url&&`<table cellpadding="0" cellspacing="0" style="margin-bottom:12px;width:100%;border-radius:9px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.12)"><tr><td style="background:#fe5a25;border-radius:9px"><a href="${d.q2url}" style="display:block;padding:15px 20px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Helvetica,Arial,sans-serif;border-radius:9px">&#128196; Solution 2 &#8212; Telecommunications &nbsp; &#8594;</a></td></tr></table>`,
+        d.q3req!==false&&d.q3url&&`<table cellpadding="0" cellspacing="0" style="margin-bottom:4px;width:100%;border-radius:9px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.12)"><tr><td style="background:#fe5a25;border-radius:9px"><a href="${d.q3url}" style="display:block;padding:15px 20px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Helvetica,Arial,sans-serif;border-radius:9px">&#128196; Solution 3 &#8212; Managed Services &nbsp; &#8594;</a></td></tr></table>`,
       ].filter(Boolean).join('');
 
       const openingLabel = d.practiceType==='new'
@@ -2160,8 +2160,8 @@ Return only the email text, no subject line, no preamble.`;
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#F1F5F9;padding:32px 16px 48px">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%">
-<tr><td style="background:#0F172A;border-radius:12px 12px 0 0;padding:18px 28px"><img src="data:image/png;base64,${logoB64}" width="180" height="34" alt="32 Byte" style="display:block;height:auto" /></td></tr>
-<tr><td style="background:linear-gradient(135deg,#0F172A 0%,#1A2D45 60%,#0F172A 100%);border-top:3px solid #fe5a25;padding:28px 28px 24px">
+<tr><td bgcolor="#0F172A" style="background:#0F172A;border-radius:12px 12px 0 0;padding:18px 28px"><img src="data:image/png;base64,${logoB64}" width="180" height="34" alt="32 Byte" style="display:block;height:auto" /></td></tr>
+<tr><td bgcolor="#1A2D45" style="background:#1A2D45;border-top:3px solid #fe5a25;padding:28px 28px 24px">
   <div style="font-size:10px;font-weight:700;letter-spacing:.14em;color:#fe5a25;text-transform:uppercase;margin-bottom:10px">&#9632; Practice Success Blueprint</div>
   <div style="font-size:26px;font-weight:800;color:#F9FAFB;line-height:1.2;margin-bottom:16px">${d.practiceName||'Your Practice'}</div>
   <table cellpadding="0" cellspacing="0"><tr>
@@ -2171,7 +2171,7 @@ Return only the email text, no subject line, no preamble.`;
 </td></tr>
 <tr><td style="background:#ffffff;padding:28px 28px 16px">
   <div style="font-size:16px;color:#0F172A;font-weight:700;margin-bottom:12px">Hi ${d.contactName||d.practiceName||'there'},</div>
-  <div style="font-size:14px;color:#475569;line-height:1.85;white-space:pre-line;padding-bottom:24px;border-bottom:2px solid #F1F5F9">${email}</div>
+  <div style="font-size:14px;color:#475569;line-height:1.85;padding-bottom:24px;border-bottom:2px solid #F1F5F9">${email.split('\n').map(line=>line.trim()?'<p style=\"margin:0 0 12px;font-size:14px;color:#475569;line-height:1.85\">'+(line)+'</p>':'<div style=\"height:4px\"></div>').join('')}</div>
   <div style="height:16px"></div>
 </td></tr>
 ${exITHTML?`<tr><td style="background:#ffffff;padding:0 28px 10px">${section('&#127970;','Existing IT Provider',exITHTML)}</td></tr>`:''}
@@ -2190,9 +2190,9 @@ ${exITHTML?`<tr><td style="background:#ffffff;padding:0 28px 10px">${section('&#
     <tr><td style="background:#1E3869;padding:10px 16px"><span style="font-size:11px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:.07em">&#9889;&nbsp; What happens next</span></td></tr>
     <tr><td style="background:#ffffff;padding:12px 16px 8px">
       <table width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding:7px 0;border-bottom:1px solid #F1F5F9"><table cellpadding="0" cellspacing="0"><tr><td style="width:28px;vertical-align:top;padding-top:1px"><div style="width:22px;height:22px;background:#fe5a25;border-radius:50%;text-align:center;font-size:11px;font-weight:800;color:#fff;line-height:22px">1</div></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">Review your quotes &#8212; reach out if you have any questions</td></tr></table></td></tr>
-        <tr><td style="padding:7px 0;border-bottom:1px solid #F1F5F9"><table cellpadding="0" cellspacing="0"><tr><td style="width:28px;vertical-align:top;padding-top:1px"><div style="width:22px;height:22px;background:#fe5a25;border-radius:50%;text-align:center;font-size:11px;font-weight:800;color:#fff;line-height:22px">2</div></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">Once accepted we&#39;ll lock in your installation date</td></tr></table></td></tr>
-        <tr><td style="padding:7px 0"><table cellpadding="0" cellspacing="0"><tr><td style="width:28px;vertical-align:top;padding-top:1px"><div style="width:22px;height:22px;background:#fe5a25;border-radius:50%;text-align:center;font-size:11px;font-weight:800;color:#fff;line-height:22px">3</div></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">We&#39;ll coordinate with all vendors so everything is ready on day one</td></tr></table></td></tr>
+        <tr><td style="padding:7px 0;border-bottom:1px solid #F1F5F9"><table cellpadding="0" cellspacing="0"><tr><td style="width:32px;vertical-align:top;padding-top:1px"><table cellpadding="0" cellspacing="0"><tr><td width="26" height="26" bgcolor="#fe5a25" style="background:#fe5a25;border-radius:13px;text-align:center;vertical-align:middle;font-size:12px;font-weight:800;color:#ffffff;font-family:Helvetica,Arial,sans-serif;line-height:26px" align="center">1</td></tr></table></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">Review your quotes &#8212; reach out if you have any questions</td></tr></table></td></tr>
+        <tr><td style="padding:7px 0;border-bottom:1px solid #F1F5F9"><table cellpadding="0" cellspacing="0"><tr><td style="width:32px;vertical-align:top;padding-top:1px"><table cellpadding="0" cellspacing="0"><tr><td width="26" height="26" bgcolor="#fe5a25" style="background:#fe5a25;border-radius:13px;text-align:center;vertical-align:middle;font-size:12px;font-weight:800;color:#ffffff;font-family:Helvetica,Arial,sans-serif;line-height:26px" align="center">2</td></tr></table></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">Once accepted we&#39;ll lock in your installation date</td></tr></table></td></tr>
+        <tr><td style="padding:7px 0"><table cellpadding="0" cellspacing="0"><tr><td style="width:32px;vertical-align:top;padding-top:1px"><table cellpadding="0" cellspacing="0"><tr><td width="26" height="26" bgcolor="#fe5a25" style="background:#fe5a25;border-radius:13px;text-align:center;vertical-align:middle;font-size:12px;font-weight:800;color:#ffffff;font-family:Helvetica,Arial,sans-serif;line-height:26px" align="center">3</td></tr></table></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">We&#39;ll coordinate with all vendors so everything is ready on day one</td></tr></table></td></tr>
       </table>
     </td></tr>
   </table>
@@ -2210,13 +2210,13 @@ ${exITHTML?`<tr><td style="background:#ffffff;padding:0 28px 10px">${section('&#
 <tr><td style="background:#0F172A;border-radius:0 0 12px 12px;padding:20px 28px">
   <table width="100%" cellpadding="0" cellspacing="0">
     <tr><td align="center" style="padding-bottom:8px"><table cellpadding="0" cellspacing="0"><tr>
-      <td style="padding:0 10px"><a href="https://32byte.com.au" style="font-size:12px;color:#64748B;text-decoration:none">Website</a></td>
-      <td style="color:#334155;font-size:12px">&#183;</td>
-      <td style="padding:0 10px"><a href="tel:1300766455" style="font-size:12px;color:#64748B;text-decoration:none">1300 766 455</a></td>
-      <td style="color:#334155;font-size:12px">&#183;</td>
-      <td style="padding:0 10px"><a href="https://32byte.com.au/contact-us/" style="font-size:12px;color:#64748B;text-decoration:none">Contact Us</a></td>
+      <td style="padding:0 10px"><a href="https://32byte.com.au" style="font-size:12px;color:#94A3B8;text-decoration:none">Website</a></td>
+      <td style="color:#475569;font-size:12px">&#183;</td>
+      <td style="padding:0 10px"><a href="tel:1300766455" style="font-size:12px;color:#94A3B8;text-decoration:none">1300 766 455</a></td>
+      <td style="color:#475569;font-size:12px">&#183;</td>
+      <td style="padding:0 10px"><a href="https://32byte.com.au/contact-us/" style="font-size:12px;color:#94A3B8;text-decoration:none">Contact Us</a></td>
     </tr></table></td></tr>
-    <tr><td align="center"><div style="font-size:11px;color:#334155;line-height:1.7">32 Byte Pty Ltd &nbsp;&#183;&nbsp; Dental IT Specialists<br>Sent following your Practice Success Blueprint meeting.</div></td></tr>
+    <tr><td align="center"><div style="font-size:11px;color:#64748B;line-height:1.7">32 Byte Pty Ltd &nbsp;&#183;&nbsp; Dental IT Specialists<br>Sent following your Practice Success Blueprint meeting.</div></td></tr>
   </table>
 </td></tr>
 </table>
