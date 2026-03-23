@@ -182,18 +182,39 @@ const MultiCheck = ({ options, selected=[], onChange, otherValues=[], onOtherCha
   );
 };
 
-// Hardware quantity row with model
-const HwRow = ({ label, model, qty, onQty, notes, onNotes, showNotes }) => (
-  <div style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:`1px solid ${C.border}` }}>
-    <div style={{ flex:1, fontSize:14, color:C.textPrimary, fontWeight:500 }}>{label}</div>
-    <div style={{ width:80 }}><Num value={qty||''} onChange={onQty} /></div>
-    {showNotes && n(qty)>0 && (
-      <div style={{ flex:1 }}>
-        <Input value={notes||''} onChange={onNotes} placeholder="Describe model / notes…" />
+// Hardware quantity row with model and optional per-device fields
+const HwRow = ({ label, model, qty, onQty, notes, onNotes, showNotes, devices, onDevices, showDeviceFields }) => {
+  const count = n(qty);
+  return (
+    <div>
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:`1px solid ${C.border}` }}>
+        <div style={{ flex:1, fontSize:14, color:C.textPrimary, fontWeight:500 }}>{label}</div>
+        <div style={{ width:80 }}><Num value={qty||''} onChange={onQty} /></div>
+        {showNotes && count>0 && (
+          <div style={{ flex:1 }}>
+            <Input value={notes||''} onChange={onNotes} placeholder="Describe model / notes…" />
+          </div>
+        )}
       </div>
-    )}
-  </div>
-);
+      {showDeviceFields && count>0 && Array.from({length:count}).map((_,i)=>{
+        const dev = (devices||[])[i]||{};
+        return (
+          <div key={i} style={{marginLeft:10,padding:'8px 12px',background:C.surfaceHi,borderRadius:8,marginBottom:6,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>{label} {count>1?i+1:''}</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+              <Input value={dev.location||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],location:v};onDevices(arr);}} placeholder="Location / room" />
+              <Input value={dev.extension||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],extension:v};onDevices(arr);}} placeholder="Extension number" />
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <Input value={dev.username||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],username:v};onDevices(arr);}} placeholder="Username / display name" />
+              <Input value={dev.mac||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],mac:v};onDevices(arr);}} placeholder="MAC address (optional)" />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 // ── Phase 0: Solution Setup ───────────────────────────────────────────────────
 const QUOTE_DEFS = [
@@ -489,7 +510,9 @@ const Phase3 = ({ d, u }) => {
   const delR  = id => u('rooms', rooms.filter(x=>x.id!==id));
   const totalD = rooms.reduce((a,r)=>a+n(r.qty),0);
   const newDevices = rooms.filter(r=>!r.existingPC).reduce((a,r)=>a+n(r.qty),0);
-  const psHrs  = newDevices * 2.5;
+  const networkingHrs = (d.switchType||d.wifiAPs||d.firewall||d.failover) ? 2 : 0;
+  const cameraHrs = d.cameras ? (n(d.cameraCount)*0.25) : 0;
+  const psHrs  = (newDevices * 2.5) + networkingHrs + cameraHrs;
   const notReq = d.q1req === false;
 
   return (
@@ -625,12 +648,11 @@ const Phase3 = ({ d, u }) => {
       })}
       <button onClick={addR} style={{ width:'100%', padding:'12px', borderRadius:10, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom:22 }}>+ Add Room</button>
 
-      {totalD>0&&(
+      {(totalD>0||d.cameras||d.switchType||d.wifiAPs)&&(
         <div style={{ background:C.navy, borderRadius:12, padding:'14px 18px', marginBottom:22 }}>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom: (networkingHrs>0||cameraHrs>0)?10:0 }}>
             {[
               ['Total Devices', totalD],
-              ['New Devices', newDevices],
               ['Est. Install Hours', psHrs.toFixed(1)+' hrs'],
             ].map(([l,v])=>(
               <div key={l} style={{ background:'rgba(255,255,255,.06)', borderRadius:8, padding:'10px 14px' }}>
@@ -639,7 +661,14 @@ const Phase3 = ({ d, u }) => {
               </div>
             ))}
           </div>
-          {totalD>newDevices && <div style={{ marginTop:8, fontSize:11, color:C.textMuted, textAlign:'center' }}>{totalD-newDevices} existing device{totalD-newDevices!==1?'s':''} — no install hours required</div>}
+          {(networkingHrs>0||cameraHrs>0||totalD>newDevices)&&(
+            <div style={{fontSize:11,color:C.textMuted,lineHeight:1.8}}>
+              {newDevices>0&&<div>• Devices: {newDevices} × 2.5 hrs = {(newDevices*2.5).toFixed(1)} hrs</div>}
+              {networkingHrs>0&&<div>• Networking setup: 2.0 hrs</div>}
+              {cameraHrs>0&&<div>• Cameras: {n(d.cameraCount)} × 15 min = {cameraHrs.toFixed(1)} hrs</div>}
+              {totalD>newDevices&&<div>• {totalD-newDevices} existing device{totalD-newDevices!==1?'s':''} excluded</div>}
+            </div>
+          )}
         </div>
       )}
 
@@ -671,6 +700,8 @@ const Phase3 = ({ d, u }) => {
                 <Toggle checked={!!sc.database} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,database:v}:x))} label={sc.database?'Yes — local database storage':'Cloud / no local storage'} />
               </Field>
             </Row>
+            <Toggle checked={!!sc.installed} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,installed:v}:x))} label="Already installed at practice" sub={sc.installed?'Existing unit':'New unit to be installed'} />
+            {sc.database && <Field label="Database Device Name" tight hint="Which PC hosts the local database?"><Input value={sc.dbDeviceName||''} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,dbDeviceName:v}:x))} placeholder="e.g. RECEPTION-PC, SERVER-01" /></Field>}
             <Field label="Notes" tight><Input value={sc.notes||''} onChange={v=>u('intraoralScanners',(d.intraoralScanners||[]).map(x=>x.id===sc.id?{...x,notes:v}:x))} placeholder="Trolley-based, chair-side, WiFi requirements…" /></Field>
           </Card>
         ))}
@@ -712,6 +743,8 @@ const Phase3 = ({ d, u }) => {
                 <Toggle checked={!!xr.database} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,database:v}:x))} label={xr.database?'Yes — RAID array required':'No local database'} />
               </Field>
             </Row>
+            <Toggle checked={!!xr.installed} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,installed:v}:x))} label="Already installed at practice" sub={xr.installed?'Existing unit':'New unit to be installed'} />
+            {xr.database && <Field label="Database Device Name" tight hint="Which PC hosts the local database?"><Input value={xr.dbDeviceName||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,dbDeviceName:v}:x))} placeholder="e.g. XRAY-PC-01, SERVER-01" /></Field>}
             <Field label="Notes" tight><Input value={xr.notes||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,notes:v}:x))} placeholder="Lead lining, room setup, vendor install coordination…" /></Field>
           </Card>
         ))}
@@ -792,8 +825,20 @@ const Phase3 = ({ d, u }) => {
       </Field>
 
       {/* Security Cameras */}
-      <Divider label="Security Cameras (UniFi G5 Turret)" />
-      <Toggle checked={!!d.cameras} onChange={v=>u('cameras',v)} label="Security cameras required" />
+      <Divider label="Security Cameras" />
+      <Toggle checked={!!d.cameras} onChange={v=>u('cameras',v)} label="New security cameras required" />
+      <div style={{marginTop:10}}>
+        <Toggle checked={!!d.existingCameras} onChange={v=>u('existingCameras',v)} label="Existing camera system in place" sub={d.existingCameras?'Capture details below':'No existing cameras'} />
+        {d.existingCameras && (
+          <div style={{ marginLeft:54, marginTop:10, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
+            <Row>
+              <Field label="Vendor / Brand" tight><Input value={d.existingCameraVendor||''} onChange={v=>u('existingCameraVendor',v)} placeholder="e.g. Hikvision, Dahua, Axis" /></Field>
+              <Field label="Number of existing cameras" tight><Num value={d.existingCameraCount||''} onChange={v=>u('existingCameraCount',v)} /></Field>
+            </Row>
+            <Field label="Notes" tight><Input value={d.existingCameraNotes||''} onChange={v=>u('existingCameraNotes',v)} placeholder="Age, condition, NVR details, reuse potential…" /></Field>
+          </div>
+        )}
+      </div>
       {d.cameras&&(
         <div style={{ marginTop:12 }}>
           <Row>
@@ -894,8 +939,10 @@ const Phase3 = ({ d, u }) => {
             <div key={mu.id} style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr auto', gap:8, padding:'8px 0', borderBottom:`1px solid ${C.border}`, alignItems:'center' }}>
               <Input value={mu.name||''} onChange={v=>u('m365Users',(d.m365Users||[]).map(x=>x.id===mu.id?{...x,name:v}:x))} placeholder="Full name" />
               <Input value={mu.email||''} onChange={v=>u('m365Users',(d.m365Users||[]).map(x=>x.id===mu.id?{...x,email:v}:x))} placeholder="email@practice.com" />
-              <Select value={mu.licence||''} onChange={v=>u('m365Users',(d.m365Users||[]).map(x=>x.id===mu.id?{...x,licence:v}:x))}
-                options={['Business Basic','Business Standard','Business Premium','Apps for Business','F1','F3','E3','E5','Other / Unknown']} placeholder="Licence type…" />
+              {mu.licence==='Other'
+                ? <Input value={mu.licenceOther||''} onChange={v=>u('m365Users',(d.m365Users||[]).map(x=>x.id===mu.id?{...x,licenceOther:v}:x))} placeholder="Describe licence type…" />
+                : <Select value={mu.licence||''} onChange={v=>u('m365Users',(d.m365Users||[]).map(x=>x.id===mu.id?{...x,licence:v}:x))}
+                    options={['Business Basic','Business Standard','Business Premium','Apps for Business','F1','F3','E3','E5','Other']} placeholder="Licence type…" />}
               <button onClick={()=>u('m365Users',(d.m365Users||[]).filter(x=>x.id!==mu.id))} style={{ color:C.red, background:'none', border:'none', cursor:'pointer', fontSize:16, fontWeight:700 }}>×</button>
             </div>
           ))}
@@ -1087,14 +1134,14 @@ const Phase4 = ({ d, u }) => {
                 </div>
               );
               return (
-                <div style={{ textAlign:'center', color:C.textMuted, fontSize:13, padding:'20px 0' }}>
-                  Custom call flow — describe the routing in the notes below.
+                <div style={{ textAlign:'center', color:C.textMuted, fontSize:13, padding:'12px 0' }}>
+                  Custom call flow — fill in the fields below and optionally upload a call flow diagram.
                 </div>
               );
             })()}
           </div>
 
-          {(d.callFlowType||'default')==='default' && (
+          {(true) && ( // Show call flow fields for both default and custom
             <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
               <Row>
                 <Field label="Welcome Greeting" tight hint="What callers hear when they call"><Input value={d.callFlowGreeting||''} onChange={v=>u('callFlowGreeting',v)} placeholder="e.g. Thanks for calling [Practice Name]…" /></Field>
@@ -1110,6 +1157,21 @@ const Phase4 = ({ d, u }) => {
           <Field label="Call Flow Notes" tight>
             <Textarea value={d.callFlowNotes||''} onChange={v=>u('callFlowNotes',v)} rows={2} placeholder="Special routing requirements, IVR options, multiple queues…" />
           </Field>
+          <Field label="Call Flow Diagram" hint="Upload an existing call flow diagram or design document.">
+            <div style={{ marginBottom:8 }}>
+              <label style={{ display:'inline-block', padding:'9px 18px', borderRadius:8, border:`2px dashed ${C.border}`, background:C.surfaceHi, color:C.orange, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                📎 Upload Call Flow
+                <input type="file" accept="image/*,.pdf" style={{ display:'none' }} onChange={e=>{
+                  const f=e.target.files[0]; if(!f) return;
+                  if(f.type.startsWith('image/')){const r=new FileReader();r.onload=ev=>u('callFlowImage',ev.target.result);r.readAsDataURL(f);}
+                  else{u('callFlowFileName',f.name);}
+                }} />
+              </label>
+              {(d.callFlowImage||d.callFlowFileName) && <button onClick={()=>{u('callFlowImage',null);u('callFlowFileName','');}} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
+            </div>
+            {d.callFlowImage && <div style={{ borderRadius:10, overflow:'hidden', border:`1.5px solid ${C.border}`, maxHeight:300 }}><img src={d.callFlowImage} alt="Call flow" style={{ width:'100%', display:'block', objectFit:'contain' }} /></div>}
+            {d.callFlowFileName && <div style={{ fontSize:13, color:C.green, fontWeight:600 }}>✓ {d.callFlowFileName} attached</div>}
+          </Field>
         </div>
       )}
 
@@ -1122,7 +1184,8 @@ const Phase4 = ({ d, u }) => {
         {(d.handsets||[]).map((h,i)=>(
           <div key={h.model}>
             <HwRow label={h.model} qty={h.qty} onQty={v=>updHw('handsets',i,'qty',v)}
-              notes={h.notes} onNotes={v=>updHw('handsets',i,'notes',v)} showNotes={h.model==='Other'} />
+              notes={h.notes} onNotes={v=>updHw('handsets',i,'notes',v)} showNotes={h.model==='Other'}
+              showDeviceFields={h.model!=='Other'} devices={h.devices||[]} onDevices={v=>updHw('handsets',i,'devices',v)} />
           </div>
         ))}
       </div>
@@ -1148,7 +1211,8 @@ const Phase4 = ({ d, u }) => {
         {(d.cordless||[]).map((h,i)=>(
           <div key={h.model}>
             <HwRow label={h.model} qty={h.qty} onQty={v=>updHw('cordless',i,'qty',v)}
-              notes={h.notes} onNotes={v=>updHw('cordless',i,'notes',v)} showNotes={h.model==='Other'} />
+              notes={h.notes} onNotes={v=>updHw('cordless',i,'notes',v)} showNotes={h.model==='Other'}
+              showDeviceFields={h.model!=='Other'} devices={h.devices||[]} onDevices={v=>updHw('cordless',i,'devices',v)} />
           </div>
         ))}
       </div>
@@ -1199,24 +1263,58 @@ const Phase5 = ({ d, u, rooms }) => {
       </Card>
 
       <Divider label="Backup & Disaster Recovery" />
-      <InfoBox type={d.server==='onprem'?'warn':'info'}>
-        {d.server==='onprem'
-          ?'On-premise server — Datto Siris BCDR appliance strongly recommended.'
-          :'Cloud-based practice — consider whether local BCDR or cloud backup best suits the practice.'}
-      </InfoBox>
-      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-        <Toggle checked={!!d.datto} onChange={v=>u('datto',v)}
-          label="Datto Siris BCDR Appliance"
-          sub="On-premise backup + automated cloud replication. Hardware included on 36-month term." />
-        <Toggle checked={!!d.cloudBackup} onChange={v=>u('cloudBackup',v)}
-          label="Standalone Cloud Backup"
-          sub="Cloud-only backup. Suitable for fully cloud-based practices." />
+      <InfoBox>Select one backup approach — BCDR includes cloud replication, so only one option is required.</InfoBox>
+      <div style={{ display:'flex', gap:8, marginBottom:14 }}>
+        {[
+          {v:'none',    l:'None'},
+          {v:'bcdr',    l:'Datto BCDR Appliance'},
+          {v:'cloud',   l:'Cloud Backup Only'},
+        ].map(o=>{
+          const a=(d.backupType||'none')===o.v;
+          return <button key={o.v} onClick={()=>{u('backupType',o.v);u('datto',o.v==='bcdr');u('cloudBackup',o.v==='cloud');}}
+            style={{flex:1,padding:'10px 8px',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',border:`2px solid ${a?C.orange:C.border}`,background:a?C.orangeLight:C.surface,color:a?C.orange:C.textSecondary,fontFamily:'inherit'}}>{o.l}</button>;
+        })}
       </div>
-
-      <Divider label="Additional" />
-      <Field label="Additional Practice Sites / Locations">
-        <Num value={d.additionalSites||''} onChange={v=>u('additionalSites',v)} />
-      </Field>
+      {(d.backupType||'none')==='bcdr' && (
+        <div style={{background:C.surfaceHi,borderRadius:10,padding:'14px 16px',border:`1.5px solid ${C.border}`,marginBottom:14}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Datto BCDR Sizing</div>
+          <Row>
+            <Field label="Estimated Data Volume (TB)" tight hint="Total data across all devices to be backed up">
+              <Select value={d.dattoDataVolume||''} onChange={v=>u('dattoDataVolume',v)} placeholder="Select volume…"
+                options={['Under 2TB','2TB','3TB','4TB','6TB','8TB','12TB','18TB','24TB','36TB+']} />
+            </Field>
+            <Field label="Devices to back up" tight>
+              <Num value={d.dattoDeviceCount||''} onChange={v=>u('dattoDeviceCount',v)} />
+            </Field>
+          </Row>
+          {d.dattoDataVolume && (() => {
+            const vol = d.dattoDataVolume;
+            let model = 'S6-X', notes = '2TB · Micro desktop · Entry level';
+            if(vol==='Under 2TB'||vol==='2TB')  { model='S6-X';  notes='2TB · Micro desktop'; }
+            if(vol==='3TB')                      { model='S6-3';  notes='3TB · 1U rack · short depth'; }
+            if(vol==='4TB')                      { model='S6-4';  notes='4TB · 1U rack · short depth'; }
+            if(vol==='6TB')                      { model='S6-6';  notes='6TB · 1U rack · short depth'; }
+            if(vol==='8TB')                      { model='S6-8';  notes='8TB · 1U rack · short depth'; }
+            if(vol==='12TB')                     { model='S6-12'; notes='12TB · 1U rack · full depth'; }
+            if(vol==='18TB')                     { model='S6-18'; notes='18TB · 1U rack · full depth'; }
+            if(vol==='24TB')                     { model='S6-24'; notes='24TB · 1U rack · full depth'; }
+            if(vol==='36TB+')                    { model='S6-36'; notes='36TB · 1U rack · full depth'; }
+            return (
+              <div style={{background:C.orangeLight,border:`1.5px solid ${C.orangeBorder}`,borderRadius:9,padding:'12px 16px',marginTop:8}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Recommended Model</div>
+                <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:C.textPrimary}}>Datto Siris {model}</div>
+                <div style={{fontSize:13,color:C.textSecondary,marginTop:2}}>{notes}</div>
+              </div>
+            );
+          })()}
+          <Field label="BCDR Notes" tight>
+            <Textarea value={d.dattoNotes||''} onChange={v=>u('dattoNotes',v)} rows={2} placeholder="RPO/RTO requirements, virtualisation needs, special retention…" />
+          </Field>
+        </div>
+      )}
+      {(d.backupType||'none')==='cloud' && (
+        <InfoBox>Cloud-only backup — suitable for fully cloud-based practices with no local servers or large imaging databases.</InfoBox>
+      )}
       <Divider label="Cyber Liability Insurance" />
       <InfoBox>Capture the practice's existing cyber insurance details — important context for our Advanced Cyber Security recommendations.</InfoBox>
       <Row>
@@ -1652,7 +1750,7 @@ ${d.notes?'Notes: '+d.notes:''}`,
         </div>
       )}
 
-      <PhaseHeader num={6} title="Practice Blueprint" sub="Your complete technology solution, tailored for your practice." />
+      <PhaseHeader num={6} title="Practice Success Blueprint" sub="Your complete technology solution, tailored for your practice." />
 
       {/* Hero */}
       <div style={{ background:`linear-gradient(135deg, ${C.navy} 0%, ${C.navyMid} 100%)`, borderRadius:16, padding:'28px 30px', marginBottom:24, position:'relative', overflow:'hidden' }}>
@@ -1686,13 +1784,16 @@ ${d.notes?'Notes: '+d.notes:''}`,
         <SumSection title="IT Infrastructure">
           {(rooms||[]).map(r=>{
             const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
-            return <SumRow key={r.id} label={r.name||'Room'} value={`${dev.label} × ${n(r.qty)}${r.database?' + RAID':''}${r.monitor&&r.monitor!=='No Monitor'?` · ${r.monitor}`:''}${r.kbMouse?' · KB+Mouse':''}`} />;
+            const rowVal = r.existingPC
+              ? `Existing PC — ${r.pcBrand||'TBC'}${r.pcAge?' ('+r.pcAge+' yrs)':''}${r.pcCpu?' · '+r.pcCpu:''}${r.pcRam?' · '+r.pcRam:''}${r.pcStorage?' · '+r.pcStorage:''}${r.pcCondition?' · '+r.pcCondition:''}`
+              : `${dev.label} × ${n(r.qty)}${r.database?' + RAID':''}${r.monitor&&r.monitor!=='No Monitor'?` · ${r.monitor}`:''}${r.kbMouse?' · KB+Mouse':''}`;
+            return <SumRow key={r.id} label={r.name||'Room'} value={rowVal} />;
           })}
           <SumRow label="Switch" value={d.switchType||null} />
           <SumRow label="Wi-Fi" value={d.wifiAPs?`${d.wifiAPs}× UniFi U7 Pro (${d.apMount||'TBC'} mount)`:null} />
           <SumRow label="Firewall" value={d.firewall?'UDM Pro':null} />
           <SumRow label="4G Failover" value={d.failover?'Teltonika TRB140':null} />
-          <SumRow label="Security Cameras" value={d.cameras?`${d.cameraCount||'?'}× UniFi G5 · ${d.nvrStorage||'NVR TBC'}`:null} />
+          <SumRow label="Security Cameras" value={d.cameras?`${d.cameraCount||'?'}× · ${d.nvrStorage||'NVR TBC'}`:null} />
           <SumRow label="Microsoft 365" value={[d.m365Premium&&`${d.m365Premium}× Business Premium`,d.m365F1&&`${d.m365F1}× F1`].filter(Boolean).join(', ')||null} />
         </SumSection>
       )}
@@ -1718,7 +1819,7 @@ ${d.notes?'Notes: '+d.notes:''}`,
       {d.q3req !== false && (
         <SumSection title="Managed IT Services" accent>
           <SumRow label="TotalCare MSA" value={endpoints>0?`${endpoints} device${endpoints!==1?'s':''}`:null} />
-          <SumRow label="Advanced Cyber Security" value={d.advancedCyber?'Included':null} />
+          <SumRow label="Advanced Cyber Security" value={d.advancedCyber?'Selected':null} />
           <SumRow label="BCDR Appliance" value={d.datto?'Datto Siris — included on 36-month term':null} />
           <SumRow label="Cloud Backup" value={d.cloudBackup?'Included':null} />
         </SumSection>
@@ -1735,6 +1836,17 @@ ${d.notes?'Notes: '+d.notes:''}`,
       <Field label="Notes for the client">
         <Textarea value={d.notes||''} onChange={v=>u('notes',v)} rows={3} disabled={!!locked}
           placeholder="Anything discussed that should appear in the client summary or follow-up email…" />
+      </Field>
+      <Divider label="Action Points, Follow-ups & Risks" />
+      <InfoBox>Internal use only — not shown to the client. Included in the internal team summary.</InfoBox>
+      <Field label="Action Points" hint="What needs to happen immediately after this meeting?">
+        <Textarea value={d.actionPoints||''} onChange={v=>u('actionPoints',v)} rows={3} disabled={!!locked} placeholder="e.g. Build quotes in KQM, contact builder re cabling, confirm M365 tenant details…" />
+      </Field>
+      <Field label="Follow-ups Required" hint="Items waiting on the client or third parties">
+        <Textarea value={d.followUps||''} onChange={v=>u('followUps',v)} rows={3} disabled={!!locked} placeholder="e.g. Practice to confirm M365 licence list, builder to confirm data point locations…" />
+      </Field>
+      <Field label="Risks & Notes" hint="Anything that could affect the project timeline or scope">
+        <Textarea value={d.risks||''} onChange={v=>u('risks',v)} rows={3} disabled={!!locked} placeholder="e.g. Medfin quote format required, imaging vendor expects to install software…" />
       </Field>
       <Field label="Internal Team Email" hint="Used for the internal summary — add before locking">
         <Input type="email" value={d.internalTeamEmail||''} onChange={v=>u('internalTeamEmail',v)} placeholder="team@32byte.com.au" disabled={!!locked} />
@@ -1866,8 +1978,8 @@ ${d.notes?'Notes: '+d.notes:''}`,
 };
 
 // ── App ────────────────────────────────────────────────────────────────────────
-const newScanner  = () => ({ id:uid(), model:'', software:'', dedicated:false, database:false, notes:'' });
-const newXray     = () => ({ id:uid(), model:'', type:'', software:'', timing:'', dedicated:false, database:false, notes:'' });
+const newScanner  = () => ({ id:uid(), model:'', software:'', dedicated:false, database:false, dbDeviceName:'', installed:false, notes:'' });
+const newXray     = () => ({ id:uid(), model:'', type:'', software:'', timing:'', dedicated:false, database:false, dbDeviceName:'', installed:false, notes:'' });
 const newOtherImg = () => ({ id:uid(), desc:'', notes:'' });
 
 const INIT = {
@@ -1916,6 +2028,9 @@ const INIT = {
   // Call flow
   callFlowType:'default', callFlowGreeting:'', callFlowHuntGroup:'', callFlowAfterHours:'', callFlowOverflow:'', callFlowVoicemailEmail:'', callFlowNotes:'',
   existing4G:false, existing4GModel:'', existing4GProvider:'', existing4GManagedBy:'',
+  backupType:'none', dattoDataVolume:'', dattoDeviceCount:'', dattoNotes:'',
+  actionPoints:'', followUps:'', risks:'',
+  callFlowImage:null, callFlowFileName:'',
   existingM365:false, m365Users:[], m365Tenant:'',
 };
 
