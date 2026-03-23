@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 // ── Brand ─────────────────────────────────────────────────────────────────────
 const C = {
@@ -194,7 +194,7 @@ const InfoBox = ({ children, type='info' }) => {
 
 // Calendar-only date picker — no manual typing, click icon to open
 const DatePicker = ({ value, onChange, placeholder='Select date…' }) => {
-  const ref = React.useRef(null);
+  const ref = useRef(null);
   const fmt = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-AU',{ weekday:'short', day:'numeric', month:'short', year:'numeric' }) : '';
   return (
     <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
@@ -2599,7 +2599,7 @@ const PasswordGate = ({ onAuth }) => {
   const [error,    setError]    = useState('');
   const [attempts, setAttempts] = useState(0);
   const [locked,   setLocked]   = useState(false);
-  const valRef = React.useRef('');
+  const valRef = useRef('');
 
   const submit = () => {
     if(locked) return;
