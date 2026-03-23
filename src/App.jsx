@@ -2058,78 +2058,142 @@ Return only the email text, no subject line, no preamble.`;
       const autoEP2 = (rooms||[]).reduce((a,r)=>a+n(r.qty),0);
       const endpoints2 = n(d.endpoints)||autoEP2;
 
-      // Build IT summary (rooms + networking only)
-      const itLines = [
-        ...(rooms||[]).map(r=>{
-          const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
-          return r.existingPC
-            ? `• ${r.name||'Room'}: Existing PC (${r.pcBrand||'brand TBC'}${r.pcAge?' · '+r.pcAge+' yrs':''})`
-            : `• ${r.name||'Room'}: ${dev.label} × ${n(r.qty)}${r.database?' + RAID':''}${r.monitor&&r.monitor!=='No Monitor'?' · '+r.monitor:''}`;
-        }),
-        d.switchType&&`• Switch: ${d.switchType}`,
-        d.wifiAPs&&`• Wi-Fi: ${d.wifiAPs}× UniFi U7 Pro${d.apMount?' ('+d.apMount+' mount)':''}`,
-        d.firewall&&`• Firewall: UDM Pro`,
-        d.failover&&`• 4G Failover: Teltonika TRB140`,
-        d.cameras&&`• Security Cameras: ${d.cameraCount||'?'}× UniFi G5${d.nvrStorage?' · '+d.nvrStorage:''}`,
-        (d.m365Premium||d.m365F1)&&`• Microsoft 365: ${[d.m365Premium&&d.m365Premium+'× Business Premium',d.m365F1&&d.m365F1+'× F1'].filter(Boolean).join(', ')}`,
-      ].filter(Boolean).join('\n') || 'Not included in this engagement.';
+      // ── HTML row builder — mirrors SumRow label | value layout ──
+      const row = (label, value) => value
+        ? `<tr><td style="padding:9px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;width:42%">${label}</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;font-size:13px;font-weight:600;color:#0F172A;text-align:right">${value}</td></tr>`
+        : '';
+      const rowRed = (label, value) => value
+        ? `<tr><td style="padding:9px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;width:42%">${label}</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;font-size:13px;font-weight:600;color:#EF4444;text-align:right">${value}</td></tr>`
+        : '';
+      const rowGreen = (label, value) => value
+        ? `<tr><td style="padding:9px 0;border-bottom:1px solid #F1F5F9;font-size:13px;color:#64748B;width:42%">${label}</td><td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;font-size:13px;font-weight:700;color:#10B981;text-align:right">${value}</td></tr>`
+        : '';
+      const badge = (text, color) => `<span style="display:inline-block;font-size:11px;font-weight:700;background:${color}22;color:${color};padding:2px 8px;border-radius:12px">${text}</span>`;
+      const wrapRows = rows => `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tbody>${rows.join('')}</tbody></table>`;
 
-      // Build imaging summary
-      const imagingLines = [
-        ...(d.intraoralScanners||[]).map((s,i)=>`• Intraoral Scanner${(d.intraoralScanners||[]).length>1?' '+(i+1):''}: ${s.model||'Model TBC'}${s.software?' · '+s.software:''}${s.dedicated?' · Dedicated PC':''}${s.database?' · RAID':''}`),
-        ...(d.xrayMachines||[]).map((x,i)=>`• ${x.type||'X-ray'}${(d.xrayMachines||[]).length>1?' '+(i+1):''}: ${x.model||'Model TBC'}${x.software?' · '+x.software:''}${x.timing?' · '+x.timing:''}${x.database?' · RAID':''}`),
-        ...(d.otherImaging||[]).map(o=>`• Other: ${o.desc||'TBC'}`),
-      ].filter(Boolean).join('\n') || 'No imaging equipment captured.';
+      // ── IT Infrastructure HTML ──
+      const devRows = (rooms||[]).map(r => {
+        const dev = DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
+        const loc = (r.deviceName&&r.deviceName!==r.name) ? `${r.name}<br><span style="font-size:11px;color:#94A3B8;font-weight:400">${r.deviceName}</span>` : (r.name||'Room');
+        const inferA = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
+        const age = parseInt(r.pcAge)||inferA||0;
+        if(r.existingPC && r.replacePC) {
+          const specs = [r.monitor&&r.monitor!=='No Monitor'&&r.monitor, r.kbMouse&&'KB+Mouse', r.database&&'RAID'].filter(Boolean).join(' · ')||'Standard';
+          return `<tr>
+            <td style="padding:9px 0;border-bottom:1px solid #F1F5F9;font-size:13px;font-weight:600;color:#0F172A;width:30%">${loc}</td>
+            <td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;font-size:12px">
+              <div style="color:#EF4444;text-decoration:line-through">${r.pcBrand||'Existing PC'}</div>
+              <div style="color:#10B981;font-weight:600">→ ${dev.label}</div>
+              <div style="color:#94A3B8;font-size:11px">${specs}</div>
+            </td>
+            <td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;text-align:right">${badge('Replace','#F97316')}</td>
+          </tr>`;
+        }
+        if(r.existingPC) {
+          const specs = [r.pcCpu&&r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@/g,'').replace(/\s+/g,' ').trim(), r.pcRam, r.pcStorage].filter(Boolean).join(' · ');
+          const statusColor = age>=5?'#EF4444':age>=3?'#F59E0B':'#10B981';
+          const statusLabel = age>=5?'EOL':age>=3?'O/W':'OK';
+          return `<tr>
+            <td style="padding:9px 0;border-bottom:1px solid #F1F5F9;font-size:13px;font-weight:600;color:#0F172A;width:30%">${loc}</td>
+            <td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;font-size:12px;color:#475569">${r.pcBrand||'—'}<br><span style="font-size:11px;color:#94A3B8">${specs||''}</span></td>
+            <td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;text-align:right">${badge(statusLabel,statusColor)}</td>
+          </tr>`;
+        }
+        const specs = [r.monitor&&r.monitor!=='No Monitor'&&r.monitor, r.kbMouse&&'KB+Mouse', r.database&&'RAID'].filter(Boolean).join(' · ')||'';
+        return `<tr>
+          <td style="padding:9px 0;border-bottom:1px solid #F1F5F9;font-size:13px;font-weight:600;color:#0F172A;width:30%">${loc}</td>
+          <td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;font-size:12px;color:#475569">${dev.label}${specs?'<br><span style="font-size:11px;color:#94A3B8">'+specs+'</span>':''}</td>
+          <td style="padding:9px 0 9px 8px;border-bottom:1px solid #F1F5F9;text-align:right">${badge('NEW','#10B981')}</td>
+        </tr>`;
+      });
 
-      // Build telco summary
-      const telcoLines = [
-        d.nbn&&`• Internet: Business NBN ${d.nbnTier||''}`,
-        d.internetType&&d.internetType!=='nbn'&&`• Internet: ${d.internetType==='fibre'?'Private Fibre':d.internetType==='leased'?'Leased Line':d.internetType} ${d.fibreSpeed||d.customSpeed||''}${d.fibreProvider?' · '+d.fibreProvider:''}`,
-        d.sim4g&&`• 4G Backup SIM: Included`,
-        d.voip&&`• VoIP Phone Service: ${d.voipLicences||'?'} licences${d.porting?' · Number porting':''}`,
-        ...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`• ${h.model} Handset: × ${h.qty}`),
-        ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`• ${h.model} Headset: × ${h.qty}`),
-        ...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>`• ${h.model} Cordless: × ${h.qty}`),
-      ].filter(Boolean).join('\n') || 'Not included in this engagement.';
+      // IT sub-header row for the device table
+      const devHeader = (rooms||[]).length>0 ? `<tr style="background:#F8FAFC"><td style="padding:6px 0;font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em">Location</td><td style="padding:6px 8px;font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em">Type / Model</td><td style="padding:6px 8px;font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.06em;text-align:right">Status</td></tr>` : '';
 
-      // Build MSA summary
-      const msaLines = [
-        endpoints2>0&&`• TotalCare MSA: ${endpoints2} device${endpoints2!==1?'s':''}`,
-        d.advancedCyber&&`• Advanced Cyber Security Suite: Included`,
-        d.datto&&`• Datto Siris BCDR Appliance: Included`,
-        d.cloudBackup&&`• Cloud Backup: Included`,
-      ].filter(Boolean).join('\n') || 'Not included in this engagement.';
+      const netRows = [
+        d.switchType && row('Switch', d.switchType),
+        d.wifiAPs && row('Wi-Fi', `${d.wifiAPs}× UniFi U7 Pro${d.apMount?' ('+d.apMount+(d.apMount==='Not mounted'&&d.apMountNotes?' — '+d.apMountNotes:d.apMount!=='Not mounted'?' mount':'')+')':''}`),
+        d.firewall && row('Firewall', 'UDM Pro'),
+        d.failover && row('4G Failover', 'Teltonika TRB140'),
+        d.cameras && row('Security Cameras', `${d.cameraCount||'?'}× · ${d.nvrStorage||'NVR TBC'}`),
+        (d.m365Premium||d.m365F1) && row('Microsoft 365', [d.m365Premium&&d.m365Premium+'× Business Premium',d.m365F1&&d.m365F1+'× F1'].filter(Boolean).join(', ')),
+      ].filter(Boolean);
+
+      const itLines = `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tbody>${devHeader}${devRows.join('')}${netRows.join('')}</tbody></table>` || '<p style="color:#94A3B8;font-size:13px">Not included.</p>';
+
+      // ── Imaging HTML ──
+      const imagingRows = [
+        ...(d.intraoralScanners||[]).map((s,i)=>row(`Intraoral Scanner${(d.intraoralScanners||[]).length>1?' '+(i+1):''}`, [s.model||'Model TBC', s.software, s.timing].filter(Boolean).join(' · '))),
+        ...(d.xrayMachines||[]).map((x,i)=>row(x.type||`X-ray ${i+1}`, [x.model||'Model TBC', x.software, x.timing].filter(Boolean).join(' · '))),
+        ...(d.otherImaging||[]).map((o,i)=>row(`Other Imaging${(d.otherImaging||[]).length>1?' '+(i+1):''}`, o.desc||'Device TBC')),
+      ].filter(Boolean);
+      const imagingLines = imagingRows.length ? wrapRows(imagingRows) : '<p style="color:#94A3B8;font-size:13px;margin:8px 0">No imaging equipment captured.</p>';
+
+      // ── Telecoms HTML ──
+      const telcoRows = [
+        d.nbn && row('Internet', `Business NBN ${d.nbnTier||''}`),
+        d.internetType&&d.internetType!=='nbn' && row('Internet', `${d.internetType==='fibre'?'Private Fibre':d.internetType==='leased'?'Leased Line':d.internetType} ${d.fibreSpeed||d.customSpeed||''}${d.fibreProvider?' · '+d.fibreProvider:''}`),
+        d.sim4g && row('4G Backup SIM', 'Included'),
+        d.voip && row('VoIP Phone Service', `${d.voipLicences||'?'} licences${d.porting?' · Number porting':''}`),
+        ...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>row(h.model+' Handset', '× '+h.qty)),
+        ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>row(h.model+' Headset', '× '+h.qty)),
+        ...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>row('Other Cordless', '× '+h.qty)),
+      ].filter(Boolean);
+      const telcoLines = telcoRows.length ? wrapRows(telcoRows) : '<p style="color:#94A3B8;font-size:13px;margin:8px 0">Not included.</p>';
+
+      // ── Managed Services HTML ──
+      const msaRows = [
+        d.msaSelected!==false && endpoints2>0 && row('TotalCare MSA', `${endpoints2} device${endpoints2!==1?'s':''}`),
+        d.advancedCyber && row('Advanced Cyber Security', 'Full Suite'),
+        !d.advancedCyber && (d.cyberSoc||d.cyberPam||d.cyberDwm||d.cyberPwdMgr) && row('Cyber Components', [d.cyberSoc&&'SOC',d.cyberPam&&'PAM',d.cyberDwm&&'Dark Web',d.cyberPwdMgr&&'Password Mgr'].filter(Boolean).join(' · ')),
+        ...(d.backupDevices||[]).filter(b=>b.name).map(b=>row(`Backup — ${b.name}`, [b.backupType, b.dataVol].filter(Boolean).join(' · '))),
+      ].filter(Boolean);
+      const msaLines = msaRows.length ? wrapRows(msaRows) : '<p style="color:#94A3B8;font-size:13px;margin:8px 0">Not included.</p>';
+
+      // ── Existing IT HTML (shown if applicable) ──
+      const existingITRows = d.practiceType==='existing'&&d.existingIT&&d.existingITCompany ? [
+        row('Company', d.existingITCompany),
+        row('Contract Type', d.existingITType||null),
+        row('Contact', [d.existingITContact,d.existingITPhone].filter(Boolean).join(' · ')||null),
+        row('Contract Expiry', d.existingITExpiry||null),
+        row('Manages', [d.existingITManagesDevices!==false&&'Devices',d.existingITManagesEmail!==false&&'Email',d.existingITManagesPhones!==false&&'Phones',d.existingITManagesInternet!==false&&'Internet',d.existingITManagesSecurity!==false&&'Security'].filter(Boolean).join(', ')||null),
+        row('32 Byte taking over', [{k:'takeoverDevices',l:'Devices'},{k:'takeoverEmail',l:'Email'},{k:'takeoverPhones',l:'Phones'},{k:'takeoverInternet',l:'Internet'},{k:'takeoverSecurity',l:'Security'}].filter(t=>d[t.k]).map(t=>t.l).join(', ')||null),
+      ].filter(Boolean) : [];
+      const existingITLines = existingITRows.length ? wrapRows(existingITRows) : '';
 
       // Build quote links as HTML buttons for email
       const quoteBtns = [
-        d.q1req!==false&&d.q1url&&{label:'Solution 1 — Hardware & Infrastructure', url:d.q1url},
-        d.q2req!==false&&d.q2url&&{label:'Solution 2 — Telecommunications', url:d.q2url},
-        d.q3req!==false&&d.q3url&&{label:'Solution 3 — Managed Services', url:d.q3url},
+        d.q1req!==false&&d.q1url&&{label:'Solution 1 &mdash; Hardware &amp; Infrastructure', url:d.q1url},
+        d.q2req!==false&&d.q2url&&{label:'Solution 2 &mdash; Telecommunications', url:d.q2url},
+        d.q3req!==false&&d.q3url&&{label:'Solution 3 &mdash; Managed Services', url:d.q3url},
       ].filter(Boolean);
       const quoteLines = quoteBtns.length>0
-        ? quoteBtns.map(q=>`<a href="${q.url}" style="display:inline-block;margin:6px 0;padding:12px 24px;background:#fe5a25;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">${q.label} →</a>`).join('<br>')
-        : 'Your formal quotes will follow shortly.';
+        ? quoteBtns.map(q=>`<table cellpadding="0" cellspacing="0" style="margin-bottom:10px;width:100%"><tr><td style="background:linear-gradient(90deg,#fe5a25,#f04a14);border-radius:9px"><a href="${q.url}" style="display:block;padding:13px 22px;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;font-family:Helvetica,Arial,sans-serif">${q.label} &rarr;</a></td></tr></table>`).join('')
+        : '<div style="font-size:14px;color:#64748B;font-style:italic;padding:4px 0">Your formal quotes will follow shortly.</div>';
 
       const openingLabel = d.practiceType==='new'
         ? (d.openingDate ? '🗓 Target Opening: '+new Date(d.openingDate+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Opening date TBC')
         : (d.goLiveDate  ? '🗓 Go-Live: '+new Date(d.goLiveDate+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Go-live date TBC');
 
       await ejs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-        to_email:        d.contactEmail,
-        to_name:         d.contactName   || d.practiceName || 'there',
-        from_name:       d.salesRep      || '32 Byte',
-        subject:         `Your Practice Success Blueprint — ${d.practiceName||'New Practice'}`,
-        message:         email,
-        practice:        d.practiceName  || '',
-        opening_date:    openingLabel,
-        it_summary:      itLines,
-        imaging_summary: imagingLines,
-        telco_summary:   telcoLines,
-        msa_summary:     msaLines,
+        to_email:          d.contactEmail,
+        to_name:           d.contactName   || d.practiceName || 'there',
+        from_name:         d.salesRep      || '32 Byte',
+        subject:           `Your Practice Success Blueprint — ${d.practiceName||'New Practice'}`,
+        message:           email,
+        practice:          d.practiceName  || '',
+        practice_type:     d.practiceType==='new' ? 'New build' : 'Existing fit-out',
+        opening_date:      openingLabel,
+        existing_it:       existingITLines,
+        it_summary:        itLines,
+        imaging_summary:   imagingLines,
+        telco_summary:     telcoLines,
+        msa_summary:       msaLines,
         q1_url: d.q1req!==false&&d.q1url ? d.q1url : '',
         q2_url: d.q2req!==false&&d.q2url ? d.q2url : '',
         q3_url: d.q3req!==false&&d.q3url ? d.q3url : '',
         has_quotes: (d.q1req!==false&&!!d.q1url)||(d.q2req!==false&&!!d.q2url)||(d.q3req!==false&&!!d.q3url) ? 'yes' : '',
+        what_next: `<table width="100%" cellpadding="0" cellspacing="0"><tbody><tr><td style="padding:8px 0;border-bottom:1px solid #F1F5F9"><table cellpadding="0" cellspacing="0"><tr><td style="width:28px;vertical-align:top;padding-top:1px"><div style="width:22px;height:22px;background:#fe5a25;border-radius:50%;text-align:center;font-size:11px;font-weight:800;color:#fff;line-height:22px">1</div></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">Review your quotes — reach out if you have any questions</td></tr></table></td></tr><tr><td style="padding:8px 0;border-bottom:1px solid #F1F5F9"><table cellpadding="0" cellspacing="0"><tr><td style="width:28px;vertical-align:top;padding-top:1px"><div style="width:22px;height:22px;background:#fe5a25;border-radius:50%;text-align:center;font-size:11px;font-weight:800;color:#fff;line-height:22px">2</div></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">Once accepted we'll lock in your installation date</td></tr></table></td></tr><tr><td style="padding:8px 0"><table cellpadding="0" cellspacing="0"><tr><td style="width:28px;vertical-align:top;padding-top:1px"><div style="width:22px;height:22px;background:#fe5a25;border-radius:50%;text-align:center;font-size:11px;font-weight:800;color:#fff;line-height:22px">3</div></td><td style="padding-left:12px;font-size:13px;color:#334155;line-height:1.6">We'll coordinate with all vendors so everything is ready on day one</td></tr></table></td></tr></tbody></table>`,
       });
       setSent(true);
     } catch(e) {
