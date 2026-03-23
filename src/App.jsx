@@ -2383,7 +2383,7 @@ ${'═'.repeat(60)}
 ATTACHED FILES (links expire 14 days)
 ${'─'.repeat(40)}
 ${jsonLink?`📎 Blueprint JSON (re-import to resume): ${jsonLink}`:'⚠️ JSON upload failed'}
-${uploads.join('\n'')
+${uploads.join('\n')
 
                       await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
                         to_email:d.internalTeamEmail,
