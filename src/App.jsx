@@ -2100,12 +2100,15 @@ Return only the email text, no subject line, no preamble.`;
         d.cloudBackup&&`• Cloud Backup: Included`,
       ].filter(Boolean).join('\n') || 'Not included in this engagement.';
 
-      // Build quote links
-      const quoteLines = [
-        d.q1req!==false&&d.q1url&&`Solution 1 — Hardware & Infrastructure:\n${d.q1url}`,
-        d.q2req!==false&&d.q2url&&`Solution 2 — Telecommunications:\n${d.q2url}`,
-        d.q3req!==false&&d.q3url&&`Solution 3 — Managed Services:\n${d.q3url}`,
-      ].filter(Boolean).join('\n\n') || 'Quotes will be sent through shortly.';
+      // Build quote links as HTML buttons for email
+      const quoteBtns = [
+        d.q1req!==false&&d.q1url&&{label:'Solution 1 — Hardware & Infrastructure', url:d.q1url},
+        d.q2req!==false&&d.q2url&&{label:'Solution 2 — Telecommunications', url:d.q2url},
+        d.q3req!==false&&d.q3url&&{label:'Solution 3 — Managed Services', url:d.q3url},
+      ].filter(Boolean);
+      const quoteLines = quoteBtns.length>0
+        ? quoteBtns.map(q=>`<a href="${q.url}" style="display:inline-block;margin:6px 0;padding:12px 24px;background:#fe5a25;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">${q.label} →</a>`).join('<br>')
+        : 'Your formal quotes will follow shortly.';
 
       const openingLabel = d.practiceType==='new'
         ? (d.openingDate ? '🗓 Target Opening: '+new Date(d.openingDate+'T00:00:00').toLocaleDateString('en-AU',{weekday:'long',day:'numeric',month:'long',year:'numeric'}) : 'Opening date TBC')
@@ -2300,7 +2303,6 @@ ${d.notes?`MEETING NOTES\n${'─'.repeat(40)}\n${d.notes}`:''}`}
                         try {
                           let blob;
                           if(typeof content === 'string' && content.startsWith('data:')) {
-                            // base64 data URL → Blob
                             const arr = content.split(','), mime = arr[0].match(/:(.*?);/)[1];
                             const bStr = atob(arr[1]);
                             const u8 = new Uint8Array(bStr.length);
@@ -2311,7 +2313,10 @@ ${d.notes?`MEETING NOTES\n${'─'.repeat(40)}\n${d.notes}`:''}`}
                           }
                           const fd = new FormData();
                           fd.append('file', blob, filename);
-                          const r = await fetch('https://file.io/?expires=14d',{method:'POST',body:fd});
+                          const ctrl = new AbortController();
+                          const timer = setTimeout(()=>ctrl.abort(), 8000);
+                          const r = await fetch('https://file.io/?expires=14d',{method:'POST',body:fd,signal:ctrl.signal});
+                          clearTimeout(timer);
                           const j = await r.json();
                           return j.success ? j.link : null;
                         } catch(e){ return null; }
@@ -2378,11 +2383,35 @@ ${d.risks}`:null,
                       if(d.callFlowImage){const l=await uploadFile(d.callFlowImage,`call-flow-diagram-${slug}.png`);if(l)uploads.push(`Call Flow Diagram: ${l}`);}
                       for(let i=0;i<(d.callFlowAudio||[]).length;i++){const a=d.callFlowAudio[i];const l=await uploadFile(a.data,a.name||`audio-${i+1}.mp3`);if(l)uploads.push(`Call Flow Audio "${a.name}": ${l}`);}
 
+                      // If any uploads failed, trigger local download as fallback
+                      if(!jsonLink) {
+                        try {
+                          const _b = new Blob([jsonStr],{type:'application/json'});
+                          const _a = document.createElement('a');
+                          _a.href = URL.createObjectURL(_b);
+                          _a.download = `blueprint-${slug}-${dt}.json`;
+                          document.body.appendChild(_a); _a.click(); document.body.removeChild(_a);
+                        } catch(e){}
+                      }
+                      // Download any images that failed to upload
+                      const failedImages = [
+                        !d.floorPlanImage||uploads.some(u=>u.includes('Floor Plan')) ? null : {data:d.floorPlanImage, name:`floor-plan-${slug}.png`},
+                        !d.cameraLayoutImage||uploads.some(u=>u.includes('Camera')) ? null : {data:d.cameraLayoutImage, name:`camera-layout-${slug}.png`},
+                        !d.callFlowImage||uploads.some(u=>u.includes('Call Flow Diagram')) ? null : {data:d.callFlowImage, name:`call-flow-${slug}.png`},
+                      ].filter(Boolean);
+                      for(const fi of failedImages){
+                        try {
+                          const _a2 = document.createElement('a');
+                          _a2.href = fi.data; _a2.download = fi.name;
+                          document.body.appendChild(_a2); _a2.click(); document.body.removeChild(_a2);
+                        } catch(e){}
+                      }
+
                       const fileSection=`
 ${'═'.repeat(60)}
 ATTACHED FILES (links expire 14 days)
 ${'─'.repeat(40)}
-${jsonLink?`📎 Blueprint JSON (re-import to resume): ${jsonLink}`:'⚠️ JSON upload failed'}
+${jsonLink?`📎 Blueprint JSON (re-import to resume): ${jsonLink}`:'⚠️ JSON upload failed — file downloaded to your device'}
 ${uploads.join('\n')}`;
 
                       await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
