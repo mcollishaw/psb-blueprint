@@ -2056,16 +2056,11 @@ ${d.notes?`MEETING NOTES\n${'─'.repeat(40)}\n${d.notes}`:''}`}
 ``,
 `SOLUTIONS IN SCOPE`,
 `${'─'.repeat(40)}`,
-[d.q1req!==false&&`✅ S1 — Hardware${d.q1url?'
-   '+d.q1url:''}`,d.q2req!==false&&`✅ S2 — Telecoms${d.q2url?'
-   '+d.q2url:''}`,d.q3req!==false&&`✅ S3 — MSA${d.q3url?'
-   '+d.q3url:''}`].filter(Boolean).join('
-'),
+[d.q1req!==false&&`✅ S1 — Hardware${d.q1url?'\n   '+d.q1url:''}`,d.q2req!==false&&`✅ S2 — Telecoms${d.q2url?'\n   '+d.q2url:''}`,d.q3req!==false&&`✅ S3 — MSA${d.q3url?'\n   '+d.q3url:''}`].filter(Boolean).join('\n'),
 ``,
 `IT INFRASTRUCTURE`,
 `${'─'.repeat(40)}`,
-rooms.map(r=>{const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];return r.existingPC?`${r.name||'Room'}: EXISTING PC — ${r.pcBrand||'TBC'} | Age: ${r.pcAge||'?'} yrs | CPU: ${r.pcCpu||'?'} | RAM: ${r.pcRam||'?'} | Storage: ${r.pcStorage||'?'}${r.pcHasGpu?' | GPU: '+r.pcGpuModel:''}` :`${r.name||'Room'}: ${dev.label} × ${n(r.qty)}${r.database?' [RAID]':''}${r.monitor&&r.monitor!=='No Monitor'?' · '+r.monitor:''}${r.kbMouse?' · KB+Mouse':''}`;}).join('
-')||'No rooms',
+rooms.map(r=>{const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];return r.existingPC?`${r.name||'Room'}: EXISTING PC — ${r.pcBrand||'TBC'} | Age: ${r.pcAge||'?'} yrs | CPU: ${r.pcCpu||'?'} | RAM: ${r.pcRam||'?'} | Storage: ${r.pcStorage||'?'}${r.pcHasGpu?' | GPU: '+r.pcGpuModel:''}` :`${r.name||'Room'}: ${dev.label} × ${n(r.qty)}${r.database?' [RAID]':''}${r.monitor&&r.monitor!=='No Monitor'?' · '+r.monitor:''}${r.kbMouse?' · KB+Mouse':''}`;}).join('\n')||'No rooms',
 `Switch: ${d.switchType||'—'} | APs: ${d.wifiAPs||'0'}× (${d.apMount||'TBC'} mount) | Existing network: ${d.existingNetwork?'Yes':'No'}`,
 `Firewall: ${d.firewall?'UDM Pro':'None'} | 4G Failover: ${d.failover?'Teltonika TRB140':'None'}`,
 d.cameras?`Cameras: ${d.cameraCount||'?'}× · NVR: ${d.nvrStorage||'TBC'}`:'Cameras: None',
