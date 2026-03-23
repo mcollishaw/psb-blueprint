@@ -878,8 +878,7 @@ const Phase3 = ({ d, u }) => {
                     </div>
                   </div>
                 );
-              })()
-            }
+              })()}
             {/* Replacement device options — shown when replacePC is true */}
             {r.existingPC && r.replacePC && (
               <div style={{marginTop:10,padding:'14px 16px',background:C.orangeLight,borderRadius:9,border:`1.5px solid ${C.orangeBorder}`}}>
