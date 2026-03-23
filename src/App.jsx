@@ -1800,93 +1800,135 @@ const Phase5 = ({ d, u, rooms }) => {
       <Divider label="Backup & Disaster Recovery" />
       <InfoBox>Select all that apply. BCDR includes local appliance + cloud replication. Cloud backup is cloud-only.</InfoBox>
       <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:14}}>
-        <InfoBox>Add each device that needs to be backed up. The app will recommend a Datto appliance or cloud plan based on the total data.</InfoBox>
-        {/* Backup devices list */}
-        {(d.backupDevices||[]).map((bd,bi)=>(
-          <div key={bd.id} style={{marginBottom:10,padding:'14px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-              <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:13,color:C.textPrimary}}>Device {bi+1}: {bd.name||'Unnamed'}</div>
-              <button onClick={()=>u('backupDevices',(d.backupDevices||[]).filter((_,x)=>x!==bi))} style={{color:C.red,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:700}}>Remove</button>
-            </div>
-            <Row>
-              <Field label="Device / PC Name" tight hint="Select from Phase 3 or type manually">
-                {(d.rooms||[]).length>0 && bd.name!=='Other — type manually'
-                  ? <Select value={bd.name||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,name:v}:x))}
-                      options={[(d.rooms||[]).map(r=>r.deviceName||r.name).filter(Boolean),'Other — type manually'].flat()}
-                      placeholder="Select device…" />
-                  : <div style={{display:'flex',gap:6}}>
-                      <Input value={bd.name==='Other — type manually'?'':bd.name||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,name:v}:x))} placeholder="e.g. SERVER-01, RECEPTION-PC" />
-                      {(d.rooms||[]).length>0&&<button onClick={()=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,name:''}:x))} style={{padding:'0 10px',borderRadius:7,background:C.surface,border:`1px solid ${C.border}`,color:C.textSecondary,fontSize:11,cursor:'pointer',whiteSpace:'nowrap'}}>Pick</button>}
-                    </div>}
-              </Field>
-              <Field label="Data Volume" tight>
-                <Select value={bd.dataVol||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,dataVol:v}:x))}
-                  options={['Under 100GB','100–250GB','250–500GB','500GB–1TB','1–2TB','2–4TB','4–6TB','6–8TB','8TB+']} placeholder="Select data size…" />
-              </Field>
-            </Row>
-            <Row>
-              <Field label="Backup Type" tight>
-                {(() => {
-                  const nm = (bd.name||'').toLowerCase();
-                  const roomRef = (d.rooms||[]).find(r=>(r.deviceName||r.name||'').toLowerCase()===nm);
-                  const isImaging = roomRef && DEVICE_OPTIONS.find(o=>o.v===roomRef.deviceType)?.imaging;
-                  const hasPms = (d.pms||'').length>0;
-                  const suggested = isImaging||hasPms ? 'BCDR Appliance (on-premise + cloud)' : 'Cloud Backup Only';
-                  const hasSuggestion = !bd.backupType && (isImaging||hasPms);
-                  return (
-                    <>
-                      {hasSuggestion&&<div style={{fontSize:11,color:C.orange,marginBottom:4}}>💡 Recommended: {suggested} — imaging or PMS data detected</div>}
-                      <Select value={bd.backupType||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,backupType:v}:x))}
-                        options={['BCDR Appliance (on-premise + cloud)','Cloud Backup Only','Both']} placeholder="Select backup type…" />
-                      {bd.backupType==='Cloud Backup Only'&&(isImaging||hasPms)&&<div style={{fontSize:11,color:C.amber,marginTop:4}}>⚠️ Cloud-only not recommended for imaging/PMS databases — BCDR provides faster local recovery</div>}
-                    </>
-                  );
-                })()}
-              </Field>
-              <Field label="RPO (Recovery Point Obj.)" tight hint="How much data loss is acceptable?">
-                <Select value={bd.rpo||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,rpo:v}:x))}
-                  options={['1 hour','4 hours','8 hours','24 hours','Best effort']} placeholder="Select RPO…" />
-              </Field>
-            </Row>
-            <Row>
-              <Field label="RTO (Recovery Time Obj.)" tight hint="How quickly must they be back online?">
-                <Select value={bd.rto||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,rto:v}:x))}
-                  options={['Same day','Within 4 hours','Within 1 hour','24–48 hours']} placeholder="Select RTO…" />
-              </Field>
-              <Field label="Data Retention" tight>
-                <Select value={bd.retention||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,retention:v}:x))}
-                  options={['30 days','90 days','1 year','3 years','7 years']} placeholder="Select retention…" />
-              </Field>
-            </Row>
-          </div>
-        ))}
-        <button onClick={()=>u('backupDevices',[...(d.backupDevices||[]),{id:uid(),name:'',dataVol:'',backupType:'',rpo:'',rto:'',retention:''}])}
-          style={{width:'100%',padding:'10px',borderRadius:9,border:`2px dashed ${C.border}`,background:'transparent',color:C.orange,fontWeight:700,fontSize:13,cursor:'pointer',marginBottom:12}}>
-          + Add Device to Back Up
-        </button>
-        {/* Auto-recommend based on total data */}
-        {(d.backupDevices||[]).some(bd=>bd.backupType&&bd.backupType.includes('BCDR'))&&(()=>{
+        <InfoBox>Add each device that needs to be backed up. The app will auto-recommend a backup type and Datto model based on your inputs.</InfoBox>
+        {(d.backupDevices||[]).map((bd,bi)=>{
+          const upd = (field,val) => u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,[field]:val}:x));
           const dataMap = {'Under 100GB':0.1,'100–250GB':0.25,'250–500GB':0.5,'500GB–1TB':1,'1–2TB':2,'2–4TB':4,'4–6TB':6,'6–8TB':8,'8TB+':10};
-          const totalTB = (d.backupDevices||[]).filter(bd=>bd.backupType&&bd.backupType.includes('BCDR')).reduce((a,bd)=>a+(dataMap[bd.dataVol]||0),0);
-          let model='S6-X', mn='2TB · Micro desktop';
-          if(totalTB<=2){model='S6-X';mn='2TB · Micro desktop';}
-          else if(totalTB<=3){model='S6-3';mn='3TB · 1U rack';}
-          else if(totalTB<=4){model='S6-4';mn='4TB · 1U rack';}
-          else if(totalTB<=6){model='S6-6';mn='6TB · 1U rack';}
-          else if(totalTB<=8){model='S6-8';mn='8TB · 1U rack';}
-          else if(totalTB<=12){model='S6-12';mn='12TB · 1U rack';}
-          else if(totalTB<=18){model='S6-18';mn='18TB · 1U rack';}
-          else if(totalTB<=24){model='S6-24';mn='24TB · 1U rack';}
-          else{model='S6-36';mn='36TB · 1U rack';}
+
+          // ── DB / imaging warning ──
+          const nm = (bd.name||'').toLowerCase();
+          const roomRef = (d.rooms||[]).find(r=>(r.deviceName||r.name||'').toLowerCase()===nm);
+          const hasDatabase = roomRef?.database;
+          const isImaging = roomRef && DEVICE_OPTIONS.find(o=>o.v===roomRef.deviceType)?.imaging;
+          const hasPms = (d.pms||'').length>0;
+          const hasDbWarning = hasDatabase || isImaging;
+
+          // ── Logic for recommendation ──
+          const retentionOver1yr = ['3 years','7 years'].includes(bd.retention);
+          const rpoUnder24hr = ['1 hour','4 hours','8 hours'].includes(bd.rpo);
+          const rtoFast = ['Same day','Within 4 hours','Within 1 hour'].includes(bd.rto);
+          const needsBCDR = retentionOver1yr || rpoUnder24hr || rtoFast || hasDbWarning;
+          const couldBeCloud = !needsBCDR && bd.retention && bd.rpo && bd.rto;
+
+          // ── Per-device Datto model ──
+          const dataTB = dataMap[bd.dataVol]||0;
+          let dModel='S6-X', dDesc='2TB · Micro desktop';
+          if(dataTB<=2){dModel='S6-X';dDesc='2TB · Micro desktop';}
+          else if(dataTB<=3){dModel='S6-3';dDesc='3TB · 1U rack';}
+          else if(dataTB<=4){dModel='S6-4';dDesc='4TB · 1U rack';}
+          else if(dataTB<=6){dModel='S6-6';dDesc='6TB · 1U rack';}
+          else if(dataTB<=8){dModel='S6-8';dDesc='8TB · 1U rack';}
+          else if(dataTB<=12){dModel='S6-12';dDesc='12TB · 1U rack';}
+          else if(dataTB<=18){dModel='S6-18';dDesc='18TB · 1U rack';}
+          else if(dataTB<=24){dModel='S6-24';dDesc='24TB · 1U rack';}
+          else{dModel='S6-36';dDesc='36TB · 1U rack';}
+
+          const showRec = bd.dataVol && bd.rpo && bd.rto && bd.retention;
+          const recIsBCDR = needsBCDR;
+
+          // Build reasons for recommendation
+          const reasons = [];
+          if(retentionOver1yr) reasons.push('retention > 1 year requires BCDR');
+          if(rpoUnder24hr) reasons.push('RPO < 24 hrs requires BCDR');
+          if(rtoFast) reasons.push('fast RTO requires BCDR');
+          if(hasDbWarning) reasons.push('database/imaging device requires BCDR');
+
           return (
-            <div style={{background:C.orangeLight,border:`1.5px solid ${C.orangeBorder}`,borderRadius:9,padding:'12px 16px',marginBottom:12}}>
-              <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Recommended BCDR Model</div>
-              <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:C.textPrimary}}>Datto Siris {model}</div>
-              <div style={{fontSize:13,color:C.textSecondary,marginTop:2}}>{mn} · Est. total: {totalTB.toFixed(1)}TB across {(d.backupDevices||[]).filter(bd=>bd.backupType&&bd.backupType.includes('BCDR')).length} device(s)</div>
+            <div key={bd.id} style={{padding:'14px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:13,color:C.textPrimary}}>Device {bi+1}: {bd.name||'Unnamed'}</div>
+                <button onClick={()=>u('backupDevices',(d.backupDevices||[]).filter((_,x)=>x!==bi))} style={{color:C.red,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:700}}>Remove</button>
+              </div>
+
+              {/* DB warning */}
+              {hasDbWarning && (
+                <div style={{display:'flex',gap:8,padding:'8px 12px',background:'rgba(239,68,68,.1)',border:'1.5px solid #EF4444',borderRadius:8,marginBottom:10,fontSize:12,color:'#FCA5A5'}}>
+                  <span>⚠️</span>
+                  <span><strong>Database device detected</strong> — {isImaging?'imaging software database':'PMS/database'} requires BCDR for safe recovery. Cloud-only backup is not suitable.</span>
+                </div>
+              )}
+
+              <Row>
+                <Field label="Device / PC Name" tight hint="Select from Phase 3 or type manually">
+                  {(d.rooms||[]).length>0 && bd.name!=='Other — type manually'
+                    ? <Select value={bd.name||''} onChange={v=>upd('name',v)}
+                        options={[(d.rooms||[]).map(r=>r.deviceName||r.name).filter(Boolean),'Other — type manually'].flat()}
+                        placeholder="Select device…" />
+                    : <div style={{display:'flex',gap:6}}>
+                        <Input value={bd.name==='Other — type manually'?'':bd.name||''} onChange={v=>upd('name',v)} placeholder="e.g. SERVER-01, RECEPTION-PC" />
+                        {(d.rooms||[]).length>0&&<button onClick={()=>upd('name','')} style={{padding:'0 10px',borderRadius:7,background:C.surface,border:`1px solid ${C.border}`,color:C.textSecondary,fontSize:11,cursor:'pointer',whiteSpace:'nowrap'}}>Pick</button>}
+                      </div>}
+                </Field>
+                <Field label="Data Volume" tight>
+                  <Select value={bd.dataVol||''} onChange={v=>upd('dataVol',v)}
+                    options={['Under 100GB','100–250GB','250–500GB','500GB–1TB','1–2TB','2–4TB','4–6TB','6–8TB','8TB+']} placeholder="Select data size…" />
+                </Field>
+              </Row>
+              <Row>
+                <Field label="RPO (Recovery Point Obj.)" tight hint="How much data loss is acceptable?">
+                  <Select value={bd.rpo||''} onChange={v=>upd('rpo',v)}
+                    options={['1 hour','4 hours','8 hours','24 hours','Best effort']} placeholder="Select RPO…" />
+                </Field>
+                <Field label="RTO (Recovery Time Obj.)" tight hint="How quickly must they be back online?">
+                  <Select value={bd.rto||''} onChange={v=>upd('rto',v)}
+                    options={['Within 1 hour','Within 4 hours','Same day','24–48 hours']} placeholder="Select RTO…" />
+                </Field>
+              </Row>
+              <Row>
+                <Field label="Data Retention" tight>
+                  <Select value={bd.retention||''} onChange={v=>upd('retention',v)}
+                    options={['30 days','90 days','1 year','3 years','7 years']} placeholder="Select retention…" />
+                </Field>
+                <Field label="Backup Type" tight>
+                  <Select value={bd.backupType||''} onChange={v=>upd('backupType',v)}
+                    options={['BCDR Appliance (on-premise + cloud)','Cloud Backup Only','Both']} placeholder="Select backup type…" />
+                  {bd.backupType==='Cloud Backup Only' && needsBCDR && (
+                    <div style={{fontSize:11,color:C.amber,marginTop:4}}>⚠️ Cloud-only not suitable — BCDR required based on your selections</div>
+                  )}
+                </Field>
+              </Row>
+
+              {/* Per-device recommendation */}
+              {showRec && (
+                <div style={{marginTop:12,borderRadius:9,overflow:'hidden',border:`1.5px solid ${recIsBCDR?C.orangeBorder:C.border}`}}>
+                  <div style={{padding:'8px 14px',background:recIsBCDR?C.orangeLight:'rgba(16,185,129,.08)',borderBottom:`1px solid ${recIsBCDR?C.orangeBorder:'rgba(16,185,129,.25)'}`}}>
+                    <span style={{fontSize:11,fontWeight:700,color:recIsBCDR?C.orange:'#10B981',textTransform:'uppercase',letterSpacing:'.06em'}}>
+                      {recIsBCDR ? '💡 Recommended: BCDR Appliance' : '💡 Recommended: Cloud Backup suitable'}
+                    </span>
+                  </div>
+                  <div style={{padding:'10px 14px',background:C.surface}}>
+                    {recIsBCDR ? (
+                      <>
+                        <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:16,color:C.textPrimary,marginBottom:3}}>Datto Siris {dModel}</div>
+                        <div style={{fontSize:12,color:C.textSecondary}}>{dDesc} · {dataTB.toFixed(1)}TB estimated</div>
+                        {reasons.length>0&&<div style={{fontSize:11,color:C.textMuted,marginTop:4}}>{reasons.join(' · ')}</div>}
+                      </>
+                    ) : (
+                      <>
+                        <div style={{fontSize:13,color:C.textPrimary,fontWeight:600,marginBottom:2}}>Datto Cloud Backup</div>
+                        <div style={{fontSize:12,color:C.textSecondary}}>No on-site appliance required · {dataTB.toFixed(1)}TB estimated · Recovery 1–5 days</div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
-        })()}
-        {/* datto/cloudBackup flags kept in sync via summary page reads */}
+        })}
+        <button onClick={()=>u('backupDevices',[...(d.backupDevices||[]),{id:uid(),name:'',dataVol:'',backupType:'',rpo:'',rto:'',retention:''}])}
+          style={{width:'100%',padding:'10px',borderRadius:9,border:`2px dashed ${C.border}`,background:'transparent',color:C.orange,fontWeight:700,fontSize:13,cursor:'pointer',marginBottom:4}}>
+          + Add Device to Back Up
+        </button>
       </div>
       <Divider label="Cyber Liability Insurance" />
       <InfoBox>Capture the practice's existing cyber insurance details — important context for our Advanced Cyber Security recommendations.</InfoBox>
