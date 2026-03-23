@@ -1696,18 +1696,22 @@ const Phase4 = ({ d, u }) => {
                     <Field label="Location" tight>
                       <Input value={dev.location||''} onChange={v=>upd(i,'location',v)} placeholder="e.g. Reception, Surgery 1" />
                     </Field>
-                    <Field label="Extension Number" tight>
-                      <Input value={dev.extension||''} onChange={v=>upd(i,'extension',v)} placeholder="e.g. 101" />
-                    </Field>
+                    {dev.deviceType!=='Headset' && (
+                      <Field label="Extension Number" tight>
+                        <Input value={dev.extension||''} onChange={v=>upd(i,'extension',v)} placeholder="e.g. 101" />
+                      </Field>
+                    )}
                   </Row>
-                  <Row>
-                    <Field label="User / Display Name" tight>
-                      <Input value={dev.displayName||''} onChange={v=>upd(i,'displayName',v)} placeholder="e.g. Reception, Dr Smith" />
-                    </Field>
-                    <Field label="MAC Address" tight>
-                      <Input value={dev.mac||''} onChange={v=>upd(i,'mac',v)} placeholder="e.g. 00:1A:2B:3C:4D:5E" />
-                    </Field>
-                  </Row>
+                  {dev.deviceType!=='Headset' && (
+                    <Row>
+                      <Field label="User / Display Name" tight>
+                        <Input value={dev.displayName||''} onChange={v=>upd(i,'displayName',v)} placeholder="e.g. Reception, Dr Smith" />
+                      </Field>
+                      <Field label="MAC Address" tight>
+                        <Input value={dev.mac||''} onChange={v=>upd(i,'mac',v)} placeholder="e.g. 00:1A:2B:3C:4D:5E" />
+                      </Field>
+                    </Row>
+                  )}
                   <Toggle checked={!!dev.existing} onChange={v=>upd(i,'existing',v)} label="Existing device (already on-site)" />
                 </div>
               );
