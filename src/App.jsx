@@ -828,60 +828,59 @@ const Phase3 = ({ d, u }) => {
                 sub={r.existingPC?'Device specs captured below — no new device or install required':'New computer will be supplied by 32 Byte'} />
             </div>
 
-            {r.existingPC ? (
-              /* ── Existing PC details ── */
-              (() => {
-                const inferredAge = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
-                const age = parseInt(r.pcAge) || inferredAge || 0;
-                const ageBorder = age>=5 ? C.red : age>=3 ? C.amber : C.border;
-                const ageBg = age>=5 ? 'rgba(239,68,68,.08)' : age>=3 ? 'rgba(245,158,11,.08)' : C.surfaceHi;
-                return (
-                  <div style={{ padding:'14px 16px', background:ageBg, borderRadius:9, border:`1.5px solid ${ageBorder}`, marginBottom:8 }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:12 }}>Existing Computer Details</div>
-                    <Row>
-                      <Field label="Brand / Model" tight><Input value={r.pcBrand||''} onChange={v=>updR(r.id,'pcBrand',v)} placeholder="e.g. Dell OptiPlex, HP EliteDesk…" /></Field>
-                      <Field label="Age (years)" tight hint={inferredAge&&!r.pcAge?`Auto-detected from CPU: ~${inferredAge} yrs`:'Override if you know the exact age'}>
-                        <Input type="number" value={r.pcAge||''} onChange={v=>updR(r.id,'pcAge',v)} placeholder={inferredAge?`~${inferredAge} (auto)`:'e.g. 3'} />
-                      </Field>
-                    </Row>
-                    {age>=5 && <InfoBox type="alert">⚠️ Device is ~{age} years old — likely end of life. Consider replacement.</InfoBox>}
-                    {age>=3 && age<5 && <InfoBox type="warn">⚠️ Device is ~{age} years old — likely out of manufacturer warranty. Discuss support options.</InfoBox>}
-                    <Row>
-                      <Field label="CPU Model" tight><Input value={r.pcCpu||''} onChange={v=>updR(r.id,'pcCpu',v)} placeholder="e.g. Intel Core i7-12700, AMD Ryzen 7 5800X" /></Field>
-                      <Field label="RAM" tight>
-                        <Select value={r.pcRam||''} onChange={v=>updR(r.id,'pcRam',v)} options={['4 GB','8 GB','16 GB','32 GB','64 GB','Other']} placeholder="Select RAM…" />
-                      </Field>
-                    </Row>
-                    <Row>
-                      <Field label="Storage" tight>
-                        <Select value={r.pcStorage||''} onChange={v=>updR(r.id,'pcStorage',v)} options={['128 GB SSD','256 GB SSD','512 GB SSD','1 TB SSD','2 TB SSD','256 GB HDD','512 GB HDD','1 TB HDD','2 TB HDD','Other']} placeholder="Select storage…" />
-                      </Field>
-                      <Field label="Graphics Card" tight>
-                        <Toggle checked={!!r.pcHasGpu} onChange={v=>updR(r.id,'pcHasGpu',v)} label={r.pcHasGpu?'Yes — GPU present':'No dedicated GPU'} />
-                      </Field>
-                    </Row>
-                    {r.pcHasGpu && <Field label="GPU Model" tight><Input value={r.pcGpuModel||''} onChange={v=>updR(r.id,'pcGpuModel',v)} placeholder="e.g. NVIDIA RTX A1000, Quadro P2000" /></Field>}
-                    <Field label="Condition" tight>
-                      <div style={{ display:'flex', gap:6 }}>
-                        {['Good','Functional','Poor','Unknown'].map(c=>{
-                          const a=r.pcCondition===c;
-                          return <button key={c} onClick={()=>updR(r.id,'pcCondition',c)} style={{ flex:1, padding:'7px 6px', borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surface, color:a?C.orange:C.textSecondary }}>{c}</button>;
-                        })}
-                      </div>
+            {/* Existing PC details — shown when existingPC is on */}
+            {r.existingPC && (()=>{
+              const inferredAge = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
+              const age = parseInt(r.pcAge) || inferredAge || 0;
+              const ageBorder = age>=5 ? C.red : age>=3 ? C.amber : C.border;
+              const ageBg = age>=5 ? 'rgba(239,68,68,.08)' : age>=3 ? 'rgba(245,158,11,.08)' : C.surfaceHi;
+              return (
+                <div style={{ padding:'14px 16px', background:ageBg, borderRadius:9, border:`1.5px solid ${ageBorder}`, marginBottom:8 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:12 }}>Existing Computer Details</div>
+                  <Row>
+                    <Field label="Brand / Model" tight><Input value={r.pcBrand||''} onChange={v=>updR(r.id,'pcBrand',v)} placeholder="e.g. Dell OptiPlex, HP EliteDesk…" /></Field>
+                    <Field label="Age (years)" tight hint={inferredAge&&!r.pcAge?`Auto-detected from CPU: ~${inferredAge} yrs`:'Override if you know the exact age'}>
+                      <Input type="number" value={r.pcAge||''} onChange={v=>updR(r.id,'pcAge',v)} placeholder={inferredAge?`~${inferredAge} (auto)`:'e.g. 3'} />
                     </Field>
-                    <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="OS version, issues, imaging software installed, reuse potential…" /></Field>
-                    {/* Replace toggle */}
-                    <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
-                      <Toggle checked={!!r.replacePC} onChange={v=>updR(r.id,'replacePC',v)}
-                        label="Replace this computer"
-                        sub={r.replacePC?'Select replacement below — existing details kept for handover':'Keep existing computer, no replacement required'} />
+                  </Row>
+                  {age>=5 && <InfoBox type="alert">⚠️ Device is ~{age} years old — likely end of life. Consider replacement.</InfoBox>}
+                  {age>=3 && age<5 && <InfoBox type="warn">⚠️ Device is ~{age} years old — likely out of manufacturer warranty. Discuss support options.</InfoBox>}
+                  <Row>
+                    <Field label="CPU Model" tight><Input value={r.pcCpu||''} onChange={v=>updR(r.id,'pcCpu',v)} placeholder="e.g. Intel Core i7-12700, AMD Ryzen 7 5800X" /></Field>
+                    <Field label="RAM" tight>
+                      <Select value={r.pcRam||''} onChange={v=>updR(r.id,'pcRam',v)} options={['4 GB','8 GB','16 GB','32 GB','64 GB','Other']} placeholder="Select RAM…" />
+                    </Field>
+                  </Row>
+                  <Row>
+                    <Field label="Storage" tight>
+                      <Select value={r.pcStorage||''} onChange={v=>updR(r.id,'pcStorage',v)} options={['128 GB SSD','256 GB SSD','512 GB SSD','1 TB SSD','2 TB SSD','256 GB HDD','512 GB HDD','1 TB HDD','2 TB HDD','Other']} placeholder="Select storage…" />
+                    </Field>
+                    <Field label="Graphics Card" tight>
+                      <Toggle checked={!!r.pcHasGpu} onChange={v=>updR(r.id,'pcHasGpu',v)} label={r.pcHasGpu?'Yes — GPU present':'No dedicated GPU'} />
+                    </Field>
+                  </Row>
+                  {r.pcHasGpu && <Field label="GPU Model" tight><Input value={r.pcGpuModel||''} onChange={v=>updR(r.id,'pcGpuModel',v)} placeholder="e.g. NVIDIA RTX A1000, Quadro P2000" /></Field>}
+                  <Field label="Condition" tight>
+                    <div style={{ display:'flex', gap:6 }}>
+                      {['Good','Functional','Poor','Unknown'].map(c=>{
+                        const a=r.pcCondition===c;
+                        return <button key={c} onClick={()=>updR(r.id,'pcCondition',c)} style={{ flex:1, padding:'7px 6px', borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surface, color:a?C.orange:C.textSecondary }}>{c}</button>;
+                      })}
                     </div>
+                  </Field>
+                  <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="OS version, issues, imaging software installed, reuse potential…" /></Field>
+                  <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+                    <Toggle checked={!!r.replacePC} onChange={v=>updR(r.id,'replacePC',v)}
+                      label="Replace this computer"
+                      sub={r.replacePC?'Select replacement below — existing details kept for handover':'Keep existing computer, no replacement required'} />
                   </div>
-                );
-              })()}
+                </div>
+              );
+            })()}
+
             {/* Replacement device options — shown when replacePC is true */}
             {r.existingPC && r.replacePC && (
-              <div style={{marginTop:10,padding:'14px 16px',background:C.orangeLight,borderRadius:9,border:`1.5px solid ${C.orangeBorder}`}}>
+              <div style={{marginTop:10,padding:'14px 16px',background:C.orangeLight,borderRadius:9,border:`1.5px solid ${C.orangeBorder}`,marginBottom:8}}>
                 <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Replacement Device</div>
                 <Field label="Device Type" tight>
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
@@ -921,8 +920,9 @@ const Phase3 = ({ d, u }) => {
                 </Row>
               </div>
             )}
+
+            {/* New device options — shown when no existing PC */}
             {!r.existingPC && (
-              /* ── New device options ── */
               <>
                 <Field label="Device Type" tight>
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
