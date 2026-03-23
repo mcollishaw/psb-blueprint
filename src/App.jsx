@@ -168,10 +168,10 @@ const Row     = ({ children, cols=2, gap=14 }) => (
   <div className={`psb-row-${cols}`} style={{ display:'grid', gridTemplateColumns:`repeat(${cols},1fr)`, gap }}>{children}</div>
 );
 const Divider = ({ label }) => (
-  <div style={{ display:'flex', alignItems:'center', gap:10, margin:'24px 0 18px' }}>
-    <div style={{ height:1, flex:1, background:C.border }}/>
-    <span style={{ fontSize:10, fontWeight:700, color:C.textMuted, letterSpacing:'.12em', textTransform:'uppercase', whiteSpace:'nowrap' }}>{label}</span>
-    <div style={{ height:1, flex:1, background:C.border }}/>
+  <div style={{ display:'flex', alignItems:'center', gap:10, margin:'28px 0 18px' }}>
+    <div style={{ height:1, flex:1, background:'rgba(255,255,255,.12)' }}/>
+    <span style={{ fontSize:11, fontWeight:800, color:'#94A3B8', letterSpacing:'.1em', textTransform:'uppercase', whiteSpace:'nowrap', background:C.bg, padding:'0 4px' }}>{label}</span>
+    <div style={{ height:1, flex:1, background:'rgba(255,255,255,.12)' }}/>
   </div>
 );
 const PhaseHeader = ({ num, title, sub }) => (
@@ -191,6 +191,25 @@ const InfoBox = ({ children, type='info' }) => {
   const [bg,bd,fc] = map[type]||map.info;
   return <div style={{ background:bg, border:`1.5px solid ${bd}`, borderRadius:9, padding:'10px 14px', marginBottom:14, fontSize:13, color:fc, lineHeight:1.5 }}>{children}</div>;
 };
+
+// Calendar-only date picker — no manual typing, click icon to open
+const DatePicker = ({ value, onChange, placeholder='Select date…' }) => {
+  const ref = React.useRef(null);
+  const fmt = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-AU',{ weekday:'short', day:'numeric', month:'short', year:'numeric' }) : '';
+  return (
+    <div style={{ position:'relative', display:'flex', alignItems:'center' }}>
+      <div onClick={()=>ref.current?.showPicker?.() || ref.current?.focus()}
+        style={{ flex:1, padding:'10px 14px', paddingRight:40, fontSize:14, border:`1.5px solid ${C.border}`, borderRadius:9, background:C.surfaceHi, color:value?C.textPrimary:C.textMuted, cursor:'pointer', userSelect:'none', minHeight:42 }}>
+        {value ? fmt(value) : <span style={{color:'rgba(255,255,255,.25)'}}>{placeholder}</span>}
+      </div>
+      <button type="button" onClick={()=>ref.current?.showPicker?.() || ref.current?.focus()}
+        style={{ position:'absolute', right:10, background:'none', border:'none', cursor:'pointer', color:C.orange, fontSize:18, padding:0, lineHeight:1 }}>📅</button>
+      <input ref={ref} type="date" value={value||''} onChange={e=>onChange(e.target.value)}
+        style={{ position:'absolute', opacity:0, width:'100%', height:'100%', top:0, left:0, cursor:'pointer' }} />
+    </div>
+  );
+};
+
 const Pill = ({ label, color=C.orange }) => (
   <span style={{ display:'inline-block', fontSize:11, fontWeight:700, color:C.white, background:color, borderRadius:20, padding:'2px 9px', marginRight:5, marginBottom:3 }}>{label}</span>
 );
@@ -215,7 +234,7 @@ const MultiCheck = ({ options, selected=[], onChange, otherValues=[], onOtherCha
             <div style={{ width:18, height:18, borderRadius:5, border:`2px solid ${checked?C.orange:C.gray200}`, background:checked?C.orange:'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all .15s' }}>
               {checked&&<span style={{ color:C.white, fontSize:11, fontWeight:700 }}>✓</span>}
             </div>
-            <span style={{ fontSize:14, color:checked?C.gray900:C.gray600, fontWeight:checked?600:400 }}>{o}</span>
+            <span style={{ fontSize:14, color:checked?C.orange:'#94A3B8', fontWeight:checked?700:400 }}>{o}</span>
           </label>
         );
       })}
@@ -354,7 +373,7 @@ const Phase0 = ({ d, u }) => (
     <Divider label="Meeting Details" />
     <Row>
       <Field label="32 Byte Sales Rep"><Input value={d.salesRep||''} onChange={v=>u('salesRep',v)} placeholder="Your name" /></Field>
-      <Field label="Meeting Date"><Input type="date" value={d.meetingDate||''} onChange={v=>u('meetingDate',v)} /></Field>
+      <Field label="Meeting Date"><DatePicker value={d.meetingDate||''} onChange={v=>u('meetingDate',v)} /></Field>
     </Row>
     <Row>
       <Field label="Client Contact Name"><Input value={d.contactName||''} onChange={v=>u('contactName',v)} placeholder="Name and role" /></Field>
@@ -412,15 +431,15 @@ const Phase1 = ({ d, u }) => {
       {d.practiceType==='new' ? (
         <Row>
           <Field label="Target Opening Date" required hint="Go-live target — everything is scoped to this.">
-            <Input type="date" value={d.openingDate||''} onChange={v=>u('openingDate',v)} />
+            <DatePicker value={d.openingDate||''} onChange={v=>u('openingDate',v)} />
           </Field>
           <Field label="Fitout Completion (estimated)">
-            <Input type="date" value={d.fitoutDate||''} onChange={v=>u('fitoutDate',v)} />
+            <DatePicker value={d.fitoutDate||''} onChange={v=>u('fitoutDate',v)} />
           </Field>
         </Row>
       ) : (
         <Field label="Go-Live Date" required hint="The date 32 Byte takes over support and management.">
-          <Input type="date" value={d.goLiveDate||''} onChange={v=>u('goLiveDate',v)} />
+          <DatePicker value={d.goLiveDate||''} onChange={v=>u('goLiveDate',v)} />
         </Field>
       )}
       {d.practiceType==='existing' && (
@@ -442,22 +461,22 @@ const Phase1 = ({ d, u }) => {
                 <Field label="Email" tight><Input type="email" value={d.existingITEmail||''} onChange={v=>u('existingITEmail',v)} placeholder="email@company.com" /></Field>
               </Row>
               <Field label="Contract Expiry" tight>
-                <Input type="date" value={d.existingITExpiry||''} onChange={v=>u('existingITExpiry',v)} />
+                <DatePicker value={d.existingITExpiry||''} onChange={v=>u('existingITExpiry',v)} />
               </Field>
-              <Field label="What does the current provider manage?" hint="All items default to yes — toggle off if they don't manage that item, then capture who does.">
+              <Field label="What does the current provider manage?" hint="All items default to yes — toggle off if they don't manage that item. Use the takeover toggle to flag services 32 Byte will take over.">
                 <div style={{ display:'flex', flexDirection:'column', gap:12, marginTop:4 }}>
                   {[
-                    {k:'existingITManagesDevices',  pk:'existingITDevices',  l:'Devices (computers, servers)'},
-                    {k:'existingITManagesEmail',     pk:'existingITEmail',    l:'Email (Microsoft 365 / Google)'},
-                    {k:'existingITManagesPhones',    pk:'existingITPhones',   l:'Phone system'},
-                    {k:'existingITManagesInternet',  pk:'existingITInternet', l:'Internet / NBN'},
-                    {k:'existingITManagesSecurity',  pk:'existingITSecurity', l:'Security (AV, patching, monitoring)'},
-                  ].map(({k,pk,l})=>(
+                    {k:'existingITManagesDevices',  pk:'existingITDevices',  tk:'takeoverDevices',  l:'Devices (computers, servers)', hint:'Current RMM, AV, endpoint management'},
+                    {k:'existingITManagesEmail',     pk:'existingITEmail',    tk:'takeoverEmail',    l:'Email (Microsoft 365 / Google)', hint:'Tenant name, current licences, migration needed?'},
+                    {k:'existingITManagesPhones',    pk:'existingITPhones',   tk:'takeoverPhones',   l:'Phone system', hint:'Current provider, DDI numbers, contract expiry'},
+                    {k:'existingITManagesInternet',  pk:'existingITInternet', tk:'takeoverInternet', l:'Internet / NBN', hint:'ISP, speed tier, contract expiry, IP addresses'},
+                    {k:'existingITManagesSecurity',  pk:'existingITSecurity', tk:'takeoverSecurity', l:'Security (AV, patching, monitoring)', hint:'Current AV/EDR vendor, licence count'},
+                  ].map(({k,pk,tk,l,hint})=>(
                     <div key={k}>
                       <Toggle checked={d[k]!==false} onChange={v=>u(k,v)} label={l} sub={d[k]!==false?'Managed by existing IT provider':'Not managed by existing IT — capture responsible party below'} />
                       {d[k]===false && (
                         <div style={{ marginLeft:54, marginTop:10, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
-                          <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:10 }}>Who manages {l.toLowerCase()}?</div>
+                          <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>Who manages {l.toLowerCase()}?</div>
                           <Row>
                             <Field label="Company" tight><Input value={(d[pk]||{}).company||''} onChange={v=>u(pk,{...(d[pk]||{}),company:v})} placeholder="Provider / company name" /></Field>
                             <Field label="Contact" tight><Input value={(d[pk]||{}).contact||''} onChange={v=>u(pk,{...(d[pk]||{}),contact:v})} placeholder="Contact name" /></Field>
@@ -466,6 +485,14 @@ const Phase1 = ({ d, u }) => {
                             <Field label="Phone" tight><Input value={(d[pk]||{}).phone||''} onChange={v=>u(pk,{...(d[pk]||{}),phone:v})} placeholder="Phone" /></Field>
                             <Field label="Email" tight><Input type="email" value={(d[pk]||{}).email||''} onChange={v=>u(pk,{...(d[pk]||{}),email:v})} placeholder="email@provider.com" /></Field>
                           </Row>
+                          {hint&&<div style={{fontSize:11,color:'#64748B',marginTop:6,lineHeight:1.5}}>📋 Capture: {hint}</div>}
+                        </div>
+                      )}
+                      {d[k]!==false && (
+                        <div style={{marginLeft:54,marginTop:4}}>
+                          <Toggle checked={!!d[tk]} onChange={v=>u(tk,v)}
+                            label="32 Byte to take over this service"
+                            sub={d[tk]?'Will migrate to 32 Byte — include in scope & quote':'Staying with current provider — exclude from scope'} />
                         </div>
                       )}
                     </div>
@@ -571,6 +598,7 @@ const Phase3 = ({ d, u }) => {
   const [importCompanies, setImportCompanies] = useState([]);
   const [importCompany, setImportCompany] = useState('');
   const [importAllRows, setImportAllRows] = useState([]);
+  const [importSearch, setImportSearch] = useState('');
 
   const addR  = () => u('rooms',[...rooms,{ id:uid(), name:'', deviceType:'practice', qty:1, monitor:'No Monitor', kbMouse:false, database:false, notes:'', existingPC:false, pcAge:'', pcBrand:'', pcCondition:'Functional', pcNotes:'' }]);
   const updR  = (id,k,v) => u('rooms', rooms.map(x=>x.id===id?{...x,[k]:v}:x));
@@ -680,7 +708,13 @@ const Phase3 = ({ d, u }) => {
         pcNotes: '',
         pcCpu: cpuClean,
         pcAge: cpuAgeYears(cpuClean)?.toString() || '',
-        pcRam: dev.ram || '',
+        pcRam: (() => {
+          const r = (dev.ram||'').replace(/GB/i,'').trim();
+          const gb = parseInt(r);
+          if(!gb) return '';
+          const opts = ['4 GB','8 GB','16 GB','32 GB','64 GB'];
+          return opts.find(o=>parseInt(o)===gb) || (gb+' GB');
+        })(),
         pcStorage: dev.storage || '',
         pcHasGpu: hasGpu,
         pcGpuModel: hasGpu ? dev.gpu : '',
@@ -689,7 +723,7 @@ const Phase3 = ({ d, u }) => {
     u('rooms', [...rooms, ...newRooms]);
     setShowImport(false);
     setImportText(''); setImportPreview([]); setImportCompanies([]);
-    setImportCompany(''); setImportAllRows([]);
+    setImportCompany(''); setImportAllRows([]); setImportSearch('');
   };
 
   return (
@@ -725,8 +759,14 @@ const Phase3 = ({ d, u }) => {
                   {importText && importCompanies.length>0 && (
                     <div style={{marginTop:10}}>
                       <div style={{fontSize:11,fontWeight:700,color:C.textSecondary,marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>{importCompanies.length} clients found — select one:</div>
-                      <div style={{maxHeight:180,overflowY:'auto',display:'flex',flexDirection:'column',gap:4}}>
-                        {importCompanies.map(c=>(
+                      <input
+                        type="text"
+                        placeholder="Search clients…"
+                        onChange={e=>setImportSearch(e.target.value||'')}
+                        style={{width:'100%',padding:'7px 10px',fontSize:12,border:`1.5px solid ${C.border}`,borderRadius:7,background:C.surfaceHi,color:C.textPrimary,marginBottom:6,outline:'none'}}
+                      />
+                      <div style={{maxHeight:160,overflowY:'auto',display:'flex',flexDirection:'column',gap:4}}>
+                        {importCompanies.filter(c=>!importSearch||c.toLowerCase().includes(importSearch.toLowerCase())).map(c=>(
                           <button key={c} onClick={()=>{setImportCompany(c);buildPreviewFromCSV(importAllRows,c);}}
                             style={{padding:'7px 10px',borderRadius:7,border:`1.5px solid ${importCompany===c?C.orange:C.border}`,background:importCompany===c?C.orangeLight:C.surface,color:importCompany===c?C.orange:C.textSecondary,fontSize:12,fontWeight:importCompany===c?700:400,cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
                             {c}
@@ -788,11 +828,11 @@ const Phase3 = ({ d, u }) => {
 
       <PhaseHeader num={3} title="IT Infrastructure" sub="Room by room, then imaging equipment and networking." />
       {notReq && (
-        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:C.amberLight, border:`1.5px solid ${C.amberBorder}`, borderRadius:10, marginBottom:20 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'rgba(239,68,68,.1)', border:`1.5px solid #EF4444`, borderRadius:10, marginBottom:20 }}>
           <span style={{ fontSize:16 }}>⚠️</span>
           <div style={{ flex:1 }}>
-            <span style={{ fontSize:13, fontWeight:700, color:'#FDE68A' }}>Quote 1 not selected for this engagement</span>
-            <span style={{ fontSize:13, color:'#FDE68A' }}> — you can still capture details here, but this section won't appear in the Blueprint.</span>
+            <span style={{ fontSize:13, fontWeight:700, color:'#FCA5A5' }}>Quote 1 not selected for this engagement</span>
+            <span style={{ fontSize:13, color:'#FCA5A5' }}> — you can still capture details here, but this section won't appear in the Blueprint.</span>
           </div>
           <button onClick={()=>u('q1req',true)} style={{ fontSize:12, fontWeight:700, color:C.orange, background:C.surface, border:`1.5px solid ${C.orange}`, borderRadius:7, padding:'4px 12px', cursor:'pointer', whiteSpace:'nowrap' }}>Add to scope</button>
         </div>
@@ -818,7 +858,7 @@ const Phase3 = ({ d, u }) => {
             </div>
             <Row>
               <Field label="Room / Location Name" tight><Input value={r.name} onChange={v=>updR(r.id,'name',v)} placeholder="e.g. Treatment Room 1, Reception…" /></Field>
-              <Field label="Quantity" tight><Num value={r.qty} onChange={v=>updR(r.id,'qty',v)} min={1} /></Field>
+              {!r.existingPC && <Field label="Quantity" tight><Num value={r.qty} onChange={v=>updR(r.id,'qty',v)} min={1} /></Field>}
             </Row>
 
             {/* Existing PC toggle — if on, hide device/monitor/peripherals */}
@@ -1055,7 +1095,7 @@ const Phase3 = ({ d, u }) => {
             <Row>
               <Field label="Imaging Software" tight><Input value={xr.software||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,software:v}:x))} placeholder="e.g. Vistasoft, Sidexis, Romexis" /></Field>
               <Field label="Timing" tight>
-                <Select value={xr.timing||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,timing:v}:x))} options={['Day one (opening)','Within 6 months','6–12 months','Future — not yet confirmed']} placeholder="When is this going in?" />
+                <Select value={xr.timing||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,timing:v}:x))} options={['Already installed','Day one (opening)','Within 6 months','6–12 months','Future — not yet confirmed']} placeholder="When is this going in?" />
               </Field>
             </Row>
             <Row>
@@ -1098,14 +1138,21 @@ const Phase3 = ({ d, u }) => {
 
       {/* Networking */}
       <Divider label="Networking" />
-      <Row>
-        <Field label="Managed Switch">
-          <Select value={d.switchType||''} onChange={v=>u('switchType',v)} placeholder="Select switch…" options={['Ubiquiti 24-port POE','Ubiquiti 48-port POE (recommended)']} />
-        </Field>
-        <Field label="Wi-Fi Access Points (UniFi U7 Pro)" hint="Confirm count and placement from floor plan">
-          <Num value={d.wifiAPs||''} onChange={v=>u('wifiAPs',v)} />
-        </Field>
-      </Row>
+      <Toggle checked={!!d.newNetworking} onChange={v=>u('newNetworking',v)}
+        label="New networking equipment required"
+        sub={d.newNetworking?'Select equipment below':'No new networking — existing infrastructure only'} />
+      {d.newNetworking && (
+        <div style={{padding:'14px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`,marginTop:10}}>
+          <Row>
+            <Field label="Managed Switch" tight>
+              <Select value={d.switchType||''} onChange={v=>u('switchType',v)} placeholder="Select switch…" options={['Ubiquiti 24-port POE','Ubiquiti 48-port POE (recommended)']} />
+            </Field>
+            <Field label="Wi-Fi APs (UniFi U7 Pro)" tight hint="Confirm count from floor plan">
+              <Num value={d.wifiAPs||''} onChange={v=>u('wifiAPs',v)} />
+            </Field>
+          </Row>
+        </div>
+      )}
       <Toggle checked={!!d.existingNetwork} onChange={v=>u('existingNetwork',v)} label="Existing network equipment in place" sub={d.existingNetwork?'Capture details below':'No existing network equipment'} />
       {d.existingNetwork && (
         <div style={{ marginLeft:54, marginTop:10, padding:'14px 16px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}`, marginBottom:12 }}>
@@ -1204,6 +1251,7 @@ const Phase3 = ({ d, u }) => {
 
       {/* Firewall */}
       <Divider label="Firewall & 4G Failover" />
+      <InfoBox>Firewall and 4G Failover are part of the network infrastructure. Both are enabled by default — toggle off if not required.</InfoBox>
       <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
         <div>
           <Toggle checked={!!d.firewall} onChange={v=>u('firewall',v)} label="UDM Pro Firewall" sub="All-in-one firewall, VPN, network controller — recommended for all practices" />
@@ -1321,10 +1369,10 @@ const Phase4 = ({ d, u }) => {
     <div>
       <PhaseHeader num={4} title="Telecommunications" sub="NBN, VoIP phone system and connectivity. This drives Quote 2." />
       {notReq && (
-        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:C.amberLight, border:`1.5px solid ${C.amberBorder}`, borderRadius:10, marginBottom:20 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'rgba(239,68,68,.1)', border:`1.5px solid #EF4444`, borderRadius:10, marginBottom:20 }}>
           <span style={{ fontSize:16 }}>⚠️</span>
           <div style={{ flex:1 }}>
-            <span style={{ fontSize:13, fontWeight:700, color:'#FDE68A' }}>Quote 2 not selected for this engagement</span>
+            <span style={{ fontSize:13, fontWeight:700, color:'#FCA5A5' }}>Quote 2 not selected for this engagement</span>
             <span style={{ fontSize:13, color:'#FDE68A' }}> — you can still capture details here, but this section won't appear in the Blueprint.</span>
           </div>
           <button onClick={()=>u('q2req',true)} style={{ fontSize:12, fontWeight:700, color:C.orange, background:C.surface, border:`1.5px solid ${C.orange}`, borderRadius:7, padding:'4px 12px', cursor:'pointer', whiteSpace:'nowrap' }}>Add to scope</button>
@@ -1373,7 +1421,7 @@ const Phase4 = ({ d, u }) => {
             </Field>
           </Row>
           {d.fibreSpeed==='Other' && <Field label="Custom Speed" tight><Input value={d.customSpeed||''} onChange={v=>u('customSpeed',v)} placeholder="e.g. 200/200 Mbps" /></Field>}
-          <Field label="Contract Expiry" tight><Input type="date" value={d.internetExpiry||''} onChange={v=>u('internetExpiry',v)} /></Field>
+          <Field label="Contract Expiry" tight><DatePicker value={d.internetExpiry||''} onChange={v=>u('internetExpiry',v)} /></Field>
         </div>
       )}
 
@@ -1560,10 +1608,10 @@ const Phase5 = ({ d, u, rooms }) => {
     <div>
       <PhaseHeader num={5} title="Managed Services" sub="The ongoing monthly investment — Quote 3. Scales as the practice grows." />
       {notReq && (
-        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:C.amberLight, border:`1.5px solid ${C.amberBorder}`, borderRadius:10, marginBottom:20 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'rgba(239,68,68,.1)', border:`1.5px solid #EF4444`, borderRadius:10, marginBottom:20 }}>
           <span style={{ fontSize:16 }}>⚠️</span>
           <div style={{ flex:1 }}>
-            <span style={{ fontSize:13, fontWeight:700, color:'#FDE68A' }}>Quote 3 not selected for this engagement</span>
+            <span style={{ fontSize:13, fontWeight:700, color:'#FCA5A5' }}>Quote 3 not selected for this engagement</span>
             <span style={{ fontSize:13, color:'#FDE68A' }}> — you can still capture details here, but this section won't appear in the Blueprint.</span>
           </div>
           <button onClick={()=>u('q3req',true)} style={{ fontSize:12, fontWeight:700, color:C.orange, background:C.surface, border:`1.5px solid ${C.orange}`, borderRadius:7, padding:'4px 12px', cursor:'pointer', whiteSpace:'nowrap' }}>Add to scope</button>
@@ -1579,61 +1627,97 @@ const Phase5 = ({ d, u, rooms }) => {
       </Field>
 
       <Divider label="Advanced Cyber Security" />
-      <Card style={{ borderColor: d.advancedCyber ? C.orangeBorder : C.gray200 }}>
+      <Card style={{ borderColor: d.advancedCyber ? C.orangeBorder : 'rgba(239,68,68,.3)' }}>
         <Toggle checked={!!d.advancedCyber} onChange={v=>u('advancedCyber',v)}
           label="Advanced Cyber Security Suite"
           sub="SOC 24/7 monitoring · Privileged access management · Password manager · Dark web monitoring" />
+        {!d.advancedCyber && <div style={{marginTop:10,padding:'8px 12px',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',borderRadius:7,fontSize:12,color:'#FCA5A5'}}>⚠️ Not selected — practice will not have 24/7 SOC monitoring or cyber protection. Document any known risks.</div>}
       </Card>
+      <div style={{display:'flex',gap:10,marginTop:8,marginBottom:4}}>
+        <a href="https://32byte.com.au/calculator/" target="_blank" rel="noopener noreferrer"
+          style={{flex:1,padding:'9px 12px',borderRadius:8,background:C.navyMid,color:C.textPrimary,fontSize:12,fontWeight:600,textDecoration:'none',textAlign:'center',border:`1px solid ${C.border}`}}>
+          🧮 Dental IT ROI Calculator
+        </a>
+        <a href="https://32byte.com.au/data-breach-cost-calculator/" target="_blank" rel="noopener noreferrer"
+          style={{flex:1,padding:'9px 12px',borderRadius:8,background:C.navyMid,color:C.textPrimary,fontSize:12,fontWeight:600,textDecoration:'none',textAlign:'center',border:`1px solid ${C.border}`}}>
+          🔐 Data Breach Cost Calculator
+        </a>
+      </div>
 
       <Divider label="Backup & Disaster Recovery" />
       <InfoBox>Select all that apply. BCDR includes local appliance + cloud replication. Cloud backup is cloud-only.</InfoBox>
       <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:14}}>
-        <Toggle checked={!!d.datto} onChange={v=>{u('datto',v);if(v)u('backupType','bcdr');}} label="Datto Siris BCDR Appliance" sub="On-premise backup + automated cloud replication. Hardware included on 36-month term." />
-        {d.datto && (
-          <div style={{marginLeft:54,padding:'14px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`}}>
-            <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Datto BCDR Sizing</div>
+        <InfoBox>Add each device that needs to be backed up. The app will recommend a Datto appliance or cloud plan based on the total data.</InfoBox>
+        {/* Backup devices list */}
+        {(d.backupDevices||[]).map((bd,bi)=>(
+          <div key={bd.id} style={{marginBottom:10,padding:'14px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:13,color:C.textPrimary}}>Device {bi+1}: {bd.name||'Unnamed'}</div>
+              <button onClick={()=>u('backupDevices',(d.backupDevices||[]).filter((_,x)=>x!==bi))} style={{color:C.red,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:700}}>Remove</button>
+            </div>
             <Row>
-              <Field label="Estimated Data Volume" tight hint="Total data to be backed up">
-                <Select value={d.dattoDataVolume||''} onChange={v=>u('dattoDataVolume',v)} placeholder="Select volume…"
-                  options={['Under 2TB','2TB','3TB','4TB','6TB','8TB','12TB','18TB','24TB','36TB+']} />
-              </Field>
-              <Field label="Devices to back up" tight>
-                <Num value={d.dattoDeviceCount||''} onChange={v=>u('dattoDeviceCount',v)} />
+              <Field label="Device / PC Name" tight><Input value={bd.name||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,name:v}:x))} placeholder="e.g. SERVER-01, RECEPTION-PC" /></Field>
+              <Field label="Data Volume" tight>
+                <Select value={bd.dataVol||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,dataVol:v}:x))}
+                  options={['Under 100GB','100–250GB','250–500GB','500GB–1TB','1–2TB','2–4TB','4–6TB','6–8TB','8TB+']} placeholder="Select data size…" />
               </Field>
             </Row>
-            {d.dattoDataVolume && (() => {
-              const vol = d.dattoDataVolume;
-              let model = 'S6-X', mn = '2TB · Micro desktop';
-              if(vol==='Under 2TB'||vol==='2TB')  { model='S6-X';  mn='2TB · Micro desktop'; }
-              if(vol==='3TB')                      { model='S6-3';  mn='3TB · 1U rack · short depth'; }
-              if(vol==='4TB')                      { model='S6-4';  mn='4TB · 1U rack · short depth'; }
-              if(vol==='6TB')                      { model='S6-6';  mn='6TB · 1U rack · short depth'; }
-              if(vol==='8TB')                      { model='S6-8';  mn='8TB · 1U rack · short depth'; }
-              if(vol==='12TB')                     { model='S6-12'; mn='12TB · 1U rack · full depth'; }
-              if(vol==='18TB')                     { model='S6-18'; mn='18TB · 1U rack · full depth'; }
-              if(vol==='24TB')                     { model='S6-24'; mn='24TB · 1U rack · full depth'; }
-              if(vol==='36TB+')                    { model='S6-36'; mn='36TB · 1U rack · full depth'; }
-              return (
-                <div style={{background:C.orangeLight,border:`1.5px solid ${C.orangeBorder}`,borderRadius:9,padding:'12px 16px',marginTop:8}}>
-                  <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Recommended Model</div>
-                  <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:C.textPrimary}}>Datto Siris {model}</div>
-                  <div style={{fontSize:13,color:C.textSecondary,marginTop:2}}>{mn}</div>
-                </div>
-              );
-            })()}
-            <Field label="BCDR Notes" tight>
-              <Textarea value={d.dattoNotes||''} onChange={v=>u('dattoNotes',v)} rows={2} placeholder="RPO/RTO requirements, virtualisation needs, special retention…" />
-            </Field>
+            <Row>
+              <Field label="Backup Type" tight>
+                <Select value={bd.backupType||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,backupType:v}:x))}
+                  options={['BCDR Appliance (on-premise + cloud)','Cloud Backup Only','Both']} placeholder="Select backup type…" />
+              </Field>
+              <Field label="RPO (Recovery Point Obj.)" tight hint="How much data loss is acceptable?">
+                <Select value={bd.rpo||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,rpo:v}:x))}
+                  options={['1 hour','4 hours','8 hours','24 hours','Best effort']} placeholder="Select RPO…" />
+              </Field>
+            </Row>
+            <Row>
+              <Field label="RTO (Recovery Time Obj.)" tight hint="How quickly must they be back online?">
+                <Select value={bd.rto||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,rto:v}:x))}
+                  options={['Same day','Within 4 hours','Within 1 hour','24–48 hours']} placeholder="Select RTO…" />
+              </Field>
+              <Field label="Data Retention" tight>
+                <Select value={bd.retention||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,retention:v}:x))}
+                  options={['30 days','90 days','1 year','3 years','7 years']} placeholder="Select retention…" />
+              </Field>
+            </Row>
           </div>
-        )}
-        <Toggle checked={!!d.cloudBackup} onChange={v=>u('cloudBackup',v)} label="Standalone Cloud Backup" sub="Cloud-only backup. Suitable for fully cloud-based practices." />
-        {d.cloudBackup && (
-          <div style={{marginLeft:54,padding:'12px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`}}>
-            <Field label="Cloud Backup Notes" tight>
-              <Textarea value={d.cloudBackupNotes||''} onChange={v=>u('cloudBackupNotes',v)} rows={2} placeholder="What needs to be covered — M365, file server, workstations…" />
-            </Field>
-          </div>
-        )}
+        ))}
+        <button onClick={()=>u('backupDevices',[...(d.backupDevices||[]),{id:uid(),name:'',dataVol:'',backupType:'',rpo:'',rto:'',retention:''}])}
+          style={{width:'100%',padding:'10px',borderRadius:9,border:`2px dashed ${C.border}`,background:'transparent',color:C.orange,fontWeight:700,fontSize:13,cursor:'pointer',marginBottom:12}}>
+          + Add Device to Back Up
+        </button>
+        {/* Auto-recommend based on total data */}
+        {(d.backupDevices||[]).some(bd=>bd.backupType&&bd.backupType.includes('BCDR'))&&(()=>{
+          const dataMap = {'Under 100GB':0.1,'100–250GB':0.25,'250–500GB':0.5,'500GB–1TB':1,'1–2TB':2,'2–4TB':4,'4–6TB':6,'6–8TB':8,'8TB+':10};
+          const totalTB = (d.backupDevices||[]).filter(bd=>bd.backupType&&bd.backupType.includes('BCDR')).reduce((a,bd)=>a+(dataMap[bd.dataVol]||0),0);
+          let model='S6-X', mn='2TB · Micro desktop';
+          if(totalTB<=2){model='S6-X';mn='2TB · Micro desktop';}
+          else if(totalTB<=3){model='S6-3';mn='3TB · 1U rack';}
+          else if(totalTB<=4){model='S6-4';mn='4TB · 1U rack';}
+          else if(totalTB<=6){model='S6-6';mn='6TB · 1U rack';}
+          else if(totalTB<=8){model='S6-8';mn='8TB · 1U rack';}
+          else if(totalTB<=12){model='S6-12';mn='12TB · 1U rack';}
+          else if(totalTB<=18){model='S6-18';mn='18TB · 1U rack';}
+          else if(totalTB<=24){model='S6-24';mn='24TB · 1U rack';}
+          else{model='S6-36';mn='36TB · 1U rack';}
+          return (
+            <div style={{background:C.orangeLight,border:`1.5px solid ${C.orangeBorder}`,borderRadius:9,padding:'12px 16px',marginBottom:12}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Recommended BCDR Model</div>
+              <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:C.textPrimary}}>Datto Siris {model}</div>
+              <div style={{fontSize:13,color:C.textSecondary,marginTop:2}}>{mn} · Est. total: {totalTB.toFixed(1)}TB across {(d.backupDevices||[]).filter(bd=>bd.backupType&&bd.backupType.includes('BCDR')).length} device(s)</div>
+            </div>
+          );
+        })()}
+        {/* Keep datto/cloudBackup flags for summary compatibility */}
+        {(()=>{
+          const hasBCDR = (d.backupDevices||[]).some(bd=>bd.backupType&&bd.backupType.includes('BCDR'));
+          const hasCloud = (d.backupDevices||[]).some(bd=>bd.backupType&&(bd.backupType.includes('Cloud')||bd.backupType.includes('Both')));
+          if(hasBCDR!==!!d.datto) u('datto',hasBCDR);
+          if(hasCloud!==!!d.cloudBackup) u('cloudBackup',hasCloud);
+          return null;
+        })()}
       </div>
       <Divider label="Cyber Liability Insurance" />
       <InfoBox>Capture the practice's existing cyber insurance details — important context for our Advanced Cyber Security recommendations.</InfoBox>
@@ -1642,7 +1726,7 @@ const Phase5 = ({ d, u, rooms }) => {
         <Field label="Policy Number"><Input value={d.cyberPolicyNumber||''} onChange={v=>u('cyberPolicyNumber',v)} placeholder="Policy number" /></Field>
       </Row>
       <Field label="Policy Expiry">
-        <Input type="date" value={d.cyberExpiry||''} onChange={v=>u('cyberExpiry',v)} />
+        <DatePicker value={d.cyberExpiry||''} onChange={v=>u('cyberExpiry',v)} />
       </Field>
       <Field label="Managed Services Notes" tight>
         <Textarea value={d.msaNotes||''} onChange={v=>u('msaNotes',v)} placeholder="Special requirements, existing contracts, additional context…" />
@@ -2168,15 +2252,37 @@ ${d.risks}`:'',
       {/* Summary sections */}
       {d.q1req !== false && (
         <SumSection title="IT Infrastructure">
-          {(rooms||[]).map(r=>{
-            const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
-            const rowVal = r.existingPC && !r.replacePC
-              ? `Existing PC — ${r.pcBrand||'TBC'}${r.pcAge?' ('+r.pcAge+' yrs)':''}${r.pcCpu?' · '+r.pcCpu:''}${r.pcRam?' · '+r.pcRam:''}${r.pcStorage?' · '+r.pcStorage:''}${r.pcCondition?' · '+r.pcCondition:''}`
-              : r.existingPC && r.replacePC
-              ? `Replace with ${dev.label} × ${n(r.qty)} (replacing: ${r.pcBrand||'existing PC'})`
-              : `${dev.label} × ${n(r.qty)}${r.database?' + RAID':''}${r.monitor&&r.monitor!=='No Monitor'?` · ${r.monitor}`:''}${r.kbMouse?' · KB+Mouse':''}`;
-            return <SumRow key={r.id} label={r.name||'Room'} value={rowVal} />;
-          })}
+          {(rooms||[]).length>0&&(
+            <div style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',marginBottom:8}}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',background:C.navyMid,padding:'6px 10px',gap:8}}>
+                {['Location','Type / Model','Specs','Status'].map(h=><div key={h} style={{fontSize:10,fontWeight:700,color:C.textMuted,textTransform:'uppercase',letterSpacing:'.06em'}}>{h}</div>)}
+              </div>
+              {(rooms||[]).map((r,ri)=>{
+                const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
+                const isExist=r.existingPC&&!r.replacePC, isReplace=r.existingPC&&r.replacePC;
+                const inferA = r.pcCpu?cpuAgeYears(r.pcCpu):null;
+                const age = parseInt(r.pcAge)||inferA||0;
+                const statusColor = isReplace?C.orange:isExist&&age>=5?C.red:isExist&&age>=3?C.amber:C.green;
+                const statusLabel = isReplace?'Replace':isExist&&age>=5?'EOL':isExist&&age>=3?'O/W':'OK';
+                return (
+                  <div key={r.id} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',padding:'8px 10px',gap:8,borderTop:ri>0?`1px solid ${C.border}`:'none',background:ri%2===0?'transparent':'rgba(255,255,255,.02)'}}>
+                    <div style={{fontSize:13,fontWeight:600,color:C.textPrimary}}>{r.name||'Room'}</div>
+                    <div style={{fontSize:12,color:C.textSecondary}}>
+                      {isExist||isReplace?<span style={{color:isReplace?C.orange:'#94A3B8'}}>{r.pcBrand||dev.label}</span>:<span>{dev.label}</span>}
+                      {isReplace&&<div style={{fontSize:11,color:C.orange,marginTop:2}}>→ {dev.label}</div>}
+                    </div>
+                    <div style={{fontSize:11,color:'#94A3B8',lineHeight:1.5}}>
+                      {isExist||isReplace?[r.pcCpu&&r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@/g,'').replace(/\s+/g,' ').trim(),r.pcRam,r.pcStorage].filter(Boolean).join(' · ') || '—':
+                        [r.monitor&&r.monitor!=='No Monitor'&&r.monitor,r.kbMouse&&'KB+Mouse',r.database&&'RAID',n(r.qty)>1&&`×${r.qty}`].filter(Boolean).join(' · ')||'Standard'}
+                    </div>
+                    <div style={{display:'flex',alignItems:'center'}}>
+                      <span style={{fontSize:11,fontWeight:700,color:statusColor,background:`${statusColor}22`,padding:'2px 8px',borderRadius:20}}>{isExist?statusLabel:isReplace?'Replace':'New'}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <SumRow label="Switch" value={d.switchType||null} />
           <SumRow label="Wi-Fi" value={d.wifiAPs?`${d.wifiAPs}× UniFi U7 Pro (${d.apMount||'TBC'} mount)`:null} />
           <SumRow label="Firewall" value={d.firewall?'UDM Pro':null} />
@@ -2225,17 +2331,21 @@ ${d.risks}`:'',
         <Textarea value={d.notes||''} onChange={v=>u('notes',v)} rows={3} disabled={!!locked}
           placeholder="Anything discussed that should appear in the client summary or follow-up email…" />
       </Field>
-      {!locked && <Divider label="Action Points, Follow-ups & Risks" />}
-      {!locked && <InfoBox>Internal use only — not shown to the client. Included in the internal team summary.</InfoBox>}
-      <Field label="Action Points" hint="What needs to happen immediately after this meeting?">
-        <Textarea value={d.actionPoints||''} onChange={v=>u('actionPoints',v)} rows={3} disabled={!!locked} placeholder="e.g. Build quotes in KQM, contact builder re cabling, confirm M365 tenant details…" />
-      </Field>
-      <Field label="Follow-ups Required" hint="Items waiting on the client or third parties">
-        <Textarea value={d.followUps||''} onChange={v=>u('followUps',v)} rows={3} disabled={!!locked} placeholder="e.g. Practice to confirm M365 licence list, builder to confirm data point locations…" />
-      </Field>
-      <Field label="Risks & Notes" hint="Anything that could affect the project timeline or scope">
-        <Textarea value={d.risks||''} onChange={v=>u('risks',v)} rows={3} disabled={!!locked} placeholder="e.g. Medfin quote format required, imaging vendor expects to install software…" />
-      </Field>
+      {!locked && (
+        <>
+          <Divider label="Action Points, Follow-ups & Risks" />
+          <InfoBox>Internal use only — not shown to the client. Included in the internal team summary.</InfoBox>
+          <Field label="Action Points" hint="What needs to happen immediately after this meeting?">
+            <Textarea value={d.actionPoints||''} onChange={v=>u('actionPoints',v)} rows={3} placeholder="e.g. Build quotes in KQM, contact builder re cabling, confirm M365 tenant details…" />
+          </Field>
+          <Field label="Follow-ups Required" hint="Items waiting on the client or third parties">
+            <Textarea value={d.followUps||''} onChange={v=>u('followUps',v)} rows={3} placeholder="e.g. Practice to confirm M365 licence list, builder to confirm data point locations…" />
+          </Field>
+          <Field label="Risks & Notes" hint="Anything that could affect the project timeline or scope">
+            <Textarea value={d.risks||''} onChange={v=>u('risks',v)} rows={3} placeholder="e.g. Medfin quote format required, imaging vendor expects to install software…" />
+          </Field>
+        </>
+      )}
       {!locked && (
         <Field label="Internal Team Email" hint="Used for the internal summary — add before locking">
           <Input type="email" value={d.internalTeamEmail||''} onChange={v=>u('internalTeamEmail',v)} placeholder="team@32byte.com.au" />
@@ -2477,8 +2587,8 @@ const INIT = {
   existingCameras:false, existingCameraVendor:'', existingCameraCount:'', existingCameraNotes:'', cameraLayoutImage:null,
   // Call flow
   callFlowType:'default', callFlowGreeting:'', callFlowHuntGroup:'', callFlowAfterHours:'', callFlowOverflow:'', callFlowVoicemailEmail:'', callFlowNotes:'',
-  existing4G:false, existing4GModel:'', existing4GProvider:'', existing4GManagedBy:'',
-  backupType:'none', dattoDataVolume:'', dattoDeviceCount:'', dattoNotes:'', cloudBackupNotes:'',
+  newNetworking:false, existing4G:false, existing4GModel:'', existing4GProvider:'', existing4GManagedBy:'',
+  backupType:'none', dattoDataVolume:'', dattoDeviceCount:'', dattoNotes:'', cloudBackupNotes:'', backupDevices:[],
   actionPoints:'', followUps:'', risks:'',
   callFlowImage:null, callFlowFileName:'',
   existingM365:false, m365Users:[], m365Tenant:'',
@@ -2496,10 +2606,11 @@ const PasswordGate = ({ onAuth }) => {
   const [error,    setError]    = useState('');
   const [attempts, setAttempts] = useState(0);
   const [locked,   setLocked]   = useState(false);
+  const valRef = React.useRef('');
 
   const submit = () => {
     if(locked) return;
-    const entered = val.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
+    const entered = valRef.current.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
     const expected = APP_PASSWORD.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
     if(entered === expected) {
       sessionStorage.setItem(AUTH_KEY, '1');
@@ -2508,11 +2619,12 @@ const PasswordGate = ({ onAuth }) => {
       const next = attempts + 1;
       setAttempts(next);
       setVal('');
+      valRef.current = '';
       if(next >= 5) {
         setLocked(true);
         setError('Too many incorrect attempts. Close and reopen the tab to try again.');
       } else {
-        setError(`Incorrect. You entered "${entered}" (${entered.length} chars), expected "${expected}" (${expected.length} chars). ${5 - next} attempt${5-next!==1?'s':''} remaining.`);
+        setError(`Incorrect password. ${5 - next} attempt${5-next!==1?'s':''} remaining.`);
       }
     }
   };
@@ -2535,16 +2647,16 @@ const PasswordGate = ({ onAuth }) => {
           <div style={{ fontSize:14, color:C.textSecondary, marginBottom:24, lineHeight:1.6 }}>This tool is for internal use. Enter the team password to continue.</div>
 
           <label style={{ display:'block', fontWeight:600, fontSize:11, color:C.textSecondary, marginBottom:6, letterSpacing:'.06em', textTransform:'uppercase' }}>Password</label>
-          <input
-            type="password"
-            value={val}
-            disabled={locked}
-            placeholder="Enter password…"
-            onChange={e=>{ setVal(e.target.value); setError(''); }}
-            onKeyDown={e=>e.key==='Enter'&&submit()}
-            style={{ width:'100%', padding:'12px 14px', fontSize:15, border:`1.5px solid ${error?C.red:C.border}`, borderRadius:9, background:C.surfaceHi, color:C.textPrimary, fontFamily:'inherit', marginBottom:14, outline:'none', transition:'border-color .15s' }}
+          <div
+            tabIndex={0}
+            onKeyDown={e=>{
+              if(locked) return;
+              if(e.key==='Backspace'){ e.preventDefault(); setVal(v=>{ const n=v.slice(0,-1); valRef.current=n; return n; }); return; }
+              if(e.key.length===1 && !e.ctrlKey && !e.metaKey){ e.preventDefault(); setVal(v=>{ const n=v+e.key; valRef.current=n; return n; }); }
+            }}
+            style={{ width:'100%', padding:'12px 14px', fontSize:15, border:`1.5px solid ${error?C.red:C.border}`, borderRadius:9, background:C.surfaceHi, color:C.textPrimary, fontFamily:'inherit', marginBottom:14, outline:'none', cursor:'text', minHeight:46, letterSpacing:'0.2em', userSelect:'none' }}
             autoFocus
-          />
+          >{val.length>0?val.replace(/./g,'●'):<span style={{color:'rgba(255,255,255,.25)',letterSpacing:'normal',fontSize:14}}>Click here and type password…</span>}</div>
 
           {error && (
             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 13px', background:'rgba(239,68,68,.1)', border:`1px solid rgba(239,68,68,.3)`, borderRadius:8, marginBottom:14 }}>
@@ -2706,8 +2818,21 @@ function App() {
 
           <div style={{ padding:'22px 20px 18px', borderBottom:'1px solid rgba(255,255,255,.07)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-              <div style={{ width:36, height:36, borderRadius:8, background:C.orange, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <span style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:14, color:C.white }}>32</span>
+              <div style={{ width:44, height:44, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <svg viewBox="0 0 80 80" width="44" height="44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="80" height="80" rx="14" fill="#F97316"/>
+                  <rect x="26" y="14" width="28" height="22" rx="6" fill="white"/>
+                  <circle cx="34" cy="23" r="3.5" fill="#F97316"/>
+                  <circle cx="46" cy="23" r="3.5" fill="#F97316"/>
+                  <rect x="38" y="27" width="4" height="5" rx="2" fill="#F97316"/>
+                  <rect x="18" y="38" width="44" height="28" rx="8" fill="white"/>
+                  <rect x="26" y="46" width="10" height="10" rx="3" fill="#F97316"/>
+                  <rect x="44" y="46" width="10" height="10" rx="3" fill="#F97316"/>
+                  <rect x="12" y="40" width="8" height="16" rx="4" fill="white"/>
+                  <rect x="60" y="40" width="8" height="16" rx="4" fill="white"/>
+                  <rect x="28" y="66" width="10" height="10" rx="3" fill="white"/>
+                  <rect x="42" y="66" width="10" height="10" rx="3" fill="white"/>
+                </svg>
               </div>
               <div>
                 <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.white, lineHeight:1.2 }}>32 Byte</div>
@@ -2739,7 +2864,7 @@ function App() {
               return (
                 <button key={i} onClick={()=>!locked&&goStep(i)}
                   style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'13px 20px', background:isA?'rgba(249,115,22,.1)':'transparent', border:'none', borderLeft:`3px solid ${isA?C.orange:'transparent'}`, cursor:locked?'default':'pointer', textAlign:'left', transition:'all .15s', opacity:outOfScope?.38:1 }}>
-                  <div style={{ width:26, height:26, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:isDone&&!isA?C.orange:isA?'rgba(249,115,22,.2)':'rgba(255,255,255,.05)' }}>
+                  <div style={{ width:30, height:30, borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, background:isDone&&!isA?C.orange:isA?'rgba(249,115,22,.2)':'rgba(255,255,255,.05)' }}>
                     {outOfScope
                       ? <span style={{ fontSize:11, color:'#64748B', fontWeight:700 }}>—</span>
                       : isDone&&!isA
@@ -2747,8 +2872,8 @@ function App() {
                         : <span style={{ fontSize:11, fontWeight:700, color:isA?C.orange:'#3D506B' }}>{i+1}</span>}
                   </div>
                   <div>
-                    <div style={{ fontSize:12, fontWeight:600, color:isA?C.white:outOfScope?'#3D506B':isDone?'#64748B':'#94A3B8', fontFamily:'Sora,sans-serif', lineHeight:1.3, textDecoration:outOfScope?'line-through':'none' }}>{s.label}</div>
-                    <div style={{ fontSize:11, color:isA?'#FED7AA':isDone?'#475569':'#64748B', marginTop:1 }}>{outOfScope?'Not in scope':s.sub}</div>
+                    <div style={{ fontSize:13, fontWeight:600, color:isA?C.white:outOfScope?'#3D506B':isDone?'#94A3B8':'#CBD5E1', fontFamily:'Sora,sans-serif', lineHeight:1.3, textDecoration:outOfScope?'line-through':'none' }}>{s.label}</div>
+                    <div style={{ fontSize:11, color:isA?'#FED7AA':isDone?'#64748B':'#94A3B8', marginTop:1 }}>{outOfScope?'Not in scope':s.sub}</div>
                   </div>
                 </button>
               );
