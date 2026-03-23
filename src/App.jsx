@@ -2126,7 +2126,10 @@ Return only the email text, no subject line, no preamble.`;
         imaging_summary: imagingLines,
         telco_summary:   telcoLines,
         msa_summary:     msaLines,
-        quote_links:     quoteLines,
+        q1_url: d.q1req!==false&&d.q1url ? d.q1url : '',
+        q2_url: d.q2req!==false&&d.q2url ? d.q2url : '',
+        q3_url: d.q3req!==false&&d.q3url ? d.q3url : '',
+        has_quotes: (d.q1req!==false&&!!d.q1url)||(d.q2req!==false&&!!d.q2url)||(d.q3req!==false&&!!d.q3url) ? 'yes' : '',
       });
       setSent(true);
     } catch(e) {
@@ -2372,57 +2375,59 @@ ${'─'.repeat(40)}
 ${d.risks}`:null,
                       ].filter(v=>v!==false&&v!==null&&v!==undefined&&v!=='').join('\n');
 
-                      // Upload JSON blueprint export
+                      // Always download JSON locally first (instant, reliable)
                       const jsonStr=JSON.stringify({...d,_exportDate:new Date().toISOString()},null,2);
-                      const jsonLink=await uploadFile(jsonStr,`blueprint-${slug}-${dt}.json`,'application/json');
+                      try {
+                        const _b=new Blob([jsonStr],{type:'application/json'});
+                        const _a=document.createElement('a');
+                        _a.href=URL.createObjectURL(_b);
+                        _a.download=`blueprint-${slug}-${dt}.json`;
+                        document.body.appendChild(_a);_a.click();document.body.removeChild(_a);
+                      } catch(dlErr){}
 
-                      // Upload any images/files captured during the session
-                      const uploads=[];
-                      if(d.floorPlanImage){const l=await uploadFile(d.floorPlanImage,`floor-plan-${slug}.png`);if(l)uploads.push(`Floor Plan: ${l}`);}
-                      if(d.cameraLayoutImage){const l=await uploadFile(d.cameraLayoutImage,`camera-layout-${slug}.png`);if(l)uploads.push(`Camera Layout: ${l}`);}
-                      if(d.callFlowImage){const l=await uploadFile(d.callFlowImage,`call-flow-diagram-${slug}.png`);if(l)uploads.push(`Call Flow Diagram: ${l}`);}
-                      for(let i=0;i<(d.callFlowAudio||[]).length;i++){const a=d.callFlowAudio[i];const l=await uploadFile(a.data,a.name||`audio-${i+1}.mp3`);if(l)uploads.push(`Call Flow Audio "${a.name}": ${l}`);}
-
-                      // If any uploads failed, trigger local download as fallback
-                      if(!jsonLink) {
-                        try {
-                          const _b = new Blob([jsonStr],{type:'application/json'});
-                          const _a = document.createElement('a');
-                          _a.href = URL.createObjectURL(_b);
-                          _a.download = `blueprint-${slug}-${dt}.json`;
-                          document.body.appendChild(_a); _a.click(); document.body.removeChild(_a);
-                        } catch(e){}
-                      }
-                      // Download any images that failed to upload
-                      const failedImages = [
-                        !d.floorPlanImage||uploads.some(u=>u.includes('Floor Plan')) ? null : {data:d.floorPlanImage, name:`floor-plan-${slug}.png`},
-                        !d.cameraLayoutImage||uploads.some(u=>u.includes('Camera')) ? null : {data:d.cameraLayoutImage, name:`camera-layout-${slug}.png`},
-                        !d.callFlowImage||uploads.some(u=>u.includes('Call Flow Diagram')) ? null : {data:d.callFlowImage, name:`call-flow-${slug}.png`},
-                      ].filter(Boolean);
-                      for(const fi of failedImages){
-                        try {
-                          const _a2 = document.createElement('a');
-                          _a2.href = fi.data; _a2.download = fi.name;
-                          document.body.appendChild(_a2); _a2.click(); document.body.removeChild(_a2);
-                        } catch(e){}
-                      }
-
-                      const fileSection=`
-${'═'.repeat(60)}
-ATTACHED FILES (links expire 14 days)
-${'─'.repeat(40)}
-${jsonLink?`📎 Blueprint JSON (re-import to resume): ${jsonLink}`:'⚠️ JSON upload failed — file downloaded to your device'}
-${uploads.join('\n')}`;
-
+                      // Send email immediately with summary (no waiting for uploads)
                       await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
                         to_email:d.internalTeamEmail,
                         practice:d.practiceName||'New Practice',
                         sales_rep:d.salesRep||'—',
                         go_live:d.practiceType==='new'?(fmtD(d.openingDate)||'TBD'):(fmtD(d.goLiveDate)||'TBD'),
                         practice_type:d.practiceType==='new'?'New build':'Existing / fit-out',
-                        summary:(fullSummary+fileSection).slice(0,45000),
+                        summary:fullSummary.slice(0,45000),
                       });
                       setInternalSent(true);
+
+                      // Upload files in background AFTER email is sent (non-blocking)
+                      // If uploads succeed, a second email with links is sent
+                      (async()=>{
+                        const uploads=[];
+                        const jsonLink=await uploadFile(jsonStr,`blueprint-${slug}-${dt}.json`,'application/json');
+                        if(jsonLink) uploads.push(`📎 Blueprint JSON: ${jsonLink}`);
+                        if(d.floorPlanImage){const l=await uploadFile(d.floorPlanImage,`floor-plan-${slug}.png`);if(l)uploads.push(`Floor Plan: ${l}`);}
+                        if(d.cameraLayoutImage){const l=await uploadFile(d.cameraLayoutImage,`camera-layout-${slug}.png`);if(l)uploads.push(`Camera Layout: ${l}`);}
+                        if(d.callFlowImage){const l=await uploadFile(d.callFlowImage,`call-flow-diagram-${slug}.png`);if(l)uploads.push(`Call Flow Diagram: ${l}`);}
+                        for(let i=0;i<(d.callFlowAudio||[]).length;i++){
+                          const a=d.callFlowAudio[i];
+                          const l=await uploadFile(a.data,a.name||`audio-${i+1}.mp3`);
+                          if(l)uploads.push(`Call Flow Audio "${a.name}": ${l}`);
+                          else {
+                            // Download failed audio locally
+                            try{const _a3=document.createElement('a');_a3.href=a.data;_a3.download=a.name||`audio-${i+1}.mp3`;document.body.appendChild(_a3);_a3.click();document.body.removeChild(_a3);}catch(e){}
+                          }
+                        }
+                        if(uploads.length>0){
+                          try{
+                            const ejs2=await loadEmailJS();
+                            await ejs2.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
+                              to_email:d.internalTeamEmail,
+                              practice:d.practiceName||'New Practice',
+                              sales_rep:'File links for '+d.practiceName,
+                              go_live:'See links below',
+                              practice_type:'File upload links (expire 14 days)',
+                              summary:'FILE UPLOAD LINKS\n'+('─'.repeat(40))+'\n'+uploads.join('\n'),
+                            });
+                          }catch(e){console.warn('File links email failed',e);}
+                        }
+                      })();
                     }catch(e){console.error(e);alert('Failed to send: '+(e.message||e.text||JSON.stringify(e)));}
                     setInternalSending(false);
                   }}
