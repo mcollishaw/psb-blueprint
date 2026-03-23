@@ -2496,13 +2496,10 @@ const PasswordGate = ({ onAuth }) => {
   const [error,    setError]    = useState('');
   const [attempts, setAttempts] = useState(0);
   const [locked,   setLocked]   = useState(false);
-  const inputRef = React.useRef(null);
 
   const submit = () => {
     if(locked) return;
-    // Read directly from DOM to catch browser extension / password manager fills
-    const rawVal = inputRef.current ? inputRef.current.value : val;
-    const entered = rawVal.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
+    const entered = val.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
     const expected = APP_PASSWORD.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
     if(entered === expected) {
       sessionStorage.setItem(AUTH_KEY, '1');
@@ -2515,7 +2512,7 @@ const PasswordGate = ({ onAuth }) => {
         setLocked(true);
         setError('Too many incorrect attempts. Close and reopen the tab to try again.');
       } else {
-        setError(`Incorrect. You entered "${entered}" (${entered.length} chars), expected "${expected}" (${expected.length} chars). ${5 - next} attempt${5-next!==1?'s':''} remaining.`);
+        setError(`Incorrect password. ${5 - next} attempt${5-next!==1?'s':''} remaining.`);
       }
     }
   };
@@ -2538,18 +2535,18 @@ const PasswordGate = ({ onAuth }) => {
           <div style={{ fontSize:14, color:C.textSecondary, marginBottom:24, lineHeight:1.6 }}>This tool is for internal use. Enter the team password to continue.</div>
 
           <label style={{ display:'block', fontWeight:600, fontSize:11, color:C.textSecondary, marginBottom:6, letterSpacing:'.06em', textTransform:'uppercase' }}>Password</label>
-          <input
-            ref={inputRef}
-            type="text"
-            defaultValue=""
-            disabled={locked}
-            placeholder="Enter password…"
-            autoComplete="off"
-            data-lpignore="true"
-            onKeyDown={e=>{ setError(''); if(e.key==='Enter') submit(); }}
-            style={{ width:'100%', padding:'12px 14px', fontSize:15, border:`1.5px solid ${error?C.red:C.border}`, borderRadius:9, background:C.surfaceHi, color:'transparent', caretColor:C.textPrimary, fontFamily:'inherit', marginBottom:14, outline:'none', transition:'border-color .15s', textShadow:`0 0 8px ${C.textPrimary}`, letterSpacing:'0.15em' }}
+          <div
+            tabIndex={0}
+            onKeyDown={e=>{
+              if(locked) return;
+              setError('');
+              if(e.key==='Enter'){ submit(); return; }
+              if(e.key==='Backspace'){ setVal(v=>v.slice(0,-1)); return; }
+              if(e.key.length===1){ setVal(v=>v+e.key); }
+            }}
+            style={{ width:'100%', padding:'12px 14px', fontSize:15, border:`1.5px solid ${error?C.red:C.border}`, borderRadius:9, background:C.surfaceHi, color:C.textPrimary, fontFamily:'inherit', marginBottom:14, outline:'none', cursor:'text', minHeight:46, letterSpacing:'0.2em', userSelect:'none' }}
             autoFocus
-          />
+          >{val.replace(/./g,'●')}<span style={{opacity:0.5}}>{'●'.repeat(Math.max(0,1-val.length))}</span></div>
 
           {error && (
             <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 13px', background:'rgba(239,68,68,.1)', border:`1px solid rgba(239,68,68,.3)`, borderRadius:8, marginBottom:14 }}>
