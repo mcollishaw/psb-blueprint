@@ -51,7 +51,7 @@ const DEVICE_OPTIONS = [
   { v:'iw-high',  label:'Imaging Workstation · High',  sub:'RTX A2000 · Fast acquisition, CAD/CAM',            gpu:'RTX A2000',    imaging:true  },
   { v:'il-mid',   label:'Imaging Laptop · Mid',        sub:'RTX Pro 1000 · Mobile imaging workstation',        gpu:'RTX Pro 1000', imaging:true  },
   { v:'il-high',  label:'Imaging Laptop · High',       sub:'RTX Pro 2000 · High-performance mobile',           gpu:'RTX Pro 2000', imaging:true  },
-  { v:'practice', label:'Practice Station',            sub:'No GPU · Reception, admin, practice manager',      gpu:'None',         imaging:false },
+  { v:'practice', label:'General Computer',             sub:'No GPU · Reception, admin, general use',           gpu:'None',         imaging:false },
 ];
 
 const uid = () => Math.random().toString(36).slice(2,8);
@@ -67,6 +67,10 @@ const guessCpuYear = (cpu) => {
 
   // Intel Core i-series — extract generation from model number
   // Pattern: i3/i5/i7/i9-XXXXX where first 2 digits = generation (>9) or 1 digit (<=9)
+  // i7-870, i5-760 etc = gen 1 (3-digit, no dash generation prefix)
+  const intelMatch1 = c.match(/I[3579]-?(\d{3})[A-Z\s]/);
+  if(intelMatch1) return 2009; // Gen 1 Nehalem/Westmere era
+
   const intelMatch = c.match(/I[3579]-(\d{4,5})/);
   if(intelMatch) {
     const num = intelMatch[1];
@@ -261,24 +265,46 @@ const MultiCheck = ({ options, selected=[], onChange, otherValues=[], onOtherCha
 };
 
 // Hardware quantity row with model and optional per-device fields
-const HwRow = ({ label, model, qty, onQty, notes, onNotes, showNotes, devices, onDevices, showDeviceFields }) => {
+const HwRow = ({ label, model, qty, onQty, notes, onNotes, showNotes, devices, onDevices, showDeviceFields, existingQty, onExistingQty, existingDevices, onExistingDevices }) => {
   const count = n(qty);
+  const exCount = n(existingQty);
   return (
     <div>
       <div style={{ display:'flex', alignItems:'center', gap:10, padding:'9px 0', borderBottom:`1px solid ${C.border}` }}>
         <div style={{ flex:1, fontSize:14, color:C.textPrimary, fontWeight:500 }}>{label}</div>
-        <div style={{ width:80 }}><Num value={qty||''} onChange={onQty} /></div>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+          <span style={{ fontSize:11, color:C.textMuted, whiteSpace:'nowrap' }}>New:</span>
+          <div style={{ width:70 }}><Num value={qty||''} onChange={onQty} /></div>
+          <span style={{ fontSize:11, color:C.textMuted, whiteSpace:'nowrap' }}>Existing:</span>
+          <div style={{ width:70 }}><Num value={existingQty||''} onChange={onExistingQty} /></div>
+        </div>
         {showNotes && count>0 && (
           <div style={{ flex:1 }}>
             <Input value={notes||''} onChange={onNotes} placeholder="Describe model / notes…" />
           </div>
         )}
       </div>
+      {showDeviceFields && exCount>0 && Array.from({length:exCount}).map((_,i)=>{
+        const dev = (existingDevices||[])[i]||{};
+        return (
+          <div key={`ex-${i}`} style={{marginLeft:10,padding:'8px 12px',background:'rgba(100,116,139,.1)',borderRadius:8,marginBottom:6,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Existing {label} {exCount>1?i+1:''}</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+              <Input value={dev.location||''} onChange={v=>{const arr=[...(existingDevices||[])];arr[i]={...arr[i],location:v};onExistingDevices(arr);}} placeholder="Location / room" />
+              <Input value={dev.extension||''} onChange={v=>{const arr=[...(existingDevices||[])];arr[i]={...arr[i],extension:v};onExistingDevices(arr);}} placeholder="Extension number" />
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <Input value={dev.username||''} onChange={v=>{const arr=[...(existingDevices||[])];arr[i]={...arr[i],username:v};onExistingDevices(arr);}} placeholder="Username / display name" />
+              <Input value={dev.mac||''} onChange={v=>{const arr=[...(existingDevices||[])];arr[i]={...arr[i],mac:v};onExistingDevices(arr);}} placeholder="MAC address (required)" style={{borderColor: !dev.mac ? C.amber : C.border}} />
+            </div>
+          </div>
+        );
+      })}
       {showDeviceFields && count>0 && Array.from({length:count}).map((_,i)=>{
         const dev = (devices||[])[i]||{};
         return (
           <div key={i} style={{marginLeft:10,padding:'8px 12px',background:C.surfaceHi,borderRadius:8,marginBottom:6,border:`1px solid ${C.border}`}}>
-            <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>{label} {count>1?i+1:''}</div>
+            <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>{label} {count>1?i+1:''} — New</div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
               <Input value={dev.location||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],location:v};onDevices(arr);}} placeholder="Location / room" />
               <Input value={dev.extension||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],extension:v};onDevices(arr);}} placeholder="Extension number" />
@@ -488,13 +514,11 @@ const Phase1 = ({ d, u }) => {
                           {hint&&<div style={{fontSize:11,color:'#64748B',marginTop:6,lineHeight:1.5}}>📋 Capture: {hint}</div>}
                         </div>
                       )}
-                      {d[k]!==false && (
-                        <div style={{marginLeft:54,marginTop:4}}>
-                          <Toggle checked={!!d[tk]} onChange={v=>u(tk,v)}
-                            label="32 Byte to take over this service"
-                            sub={d[tk]?'Will migrate to 32 Byte — include in scope & quote':'Staying with current provider — exclude from scope'} />
-                        </div>
-                      )}
+                      <div style={{marginLeft:54,marginTop:4}}>
+                        <Toggle checked={!!d[tk]} onChange={v=>u(tk,v)}
+                          label="32 Byte to take over this service"
+                          sub={d[tk]?'Will migrate to 32 Byte — include in scope & quote':'Staying with current provider — exclude from scope'} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -844,21 +868,31 @@ const Phase3 = ({ d, u }) => {
         const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
         return (
           <Card key={r.id} style={{ borderColor:dev.imaging?C.orangeBorder:C.gray200 }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:14 }}>
-              <div>
-                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:15, color:C.textPrimary }}>{r.name||`Room ${i+1}`}</div>
-                <div style={{ marginTop:4 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:r.collapsed?0:14 }}>
+              <div style={{flex:1,cursor:'pointer'}} onClick={()=>updR(r.id,'collapsed',!r.collapsed)}>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{color:C.textMuted,fontSize:12}}>{r.collapsed?'▶':'▼'}</span>
+                  <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:15, color:C.textPrimary }}>{r.name||`Room ${i+1}`}{r.deviceName?<span style={{fontWeight:400,color:C.textSecondary,fontSize:13}}> · {r.deviceName}</span>:''}</div>
+                </div>
+                {r.collapsed && <div style={{ marginTop:4, marginLeft:20 }}>
+                  <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
+                  {r.existingPC&&<Pill label={`Existing${r.pcAge?' · '+r.pcAge+'yr':''}`} color={C.gray600} />}
+                  {r.replacePC&&<Pill label="Replace" color={C.orange} />}
+                </div>}
+                {!r.collapsed && <div style={{ marginTop:4 }}>
                   <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
                   {dev.gpu!=='None'&&<Pill label={dev.gpu} color={C.gray600} />}
                   {r.database&&<Pill label="RAID Storage" color={C.amber} />}
                   {r.monitor&&r.monitor!=='No Monitor'&&<Pill label={r.monitor} color={C.navyMid} />}
-                </div>
+                </div>}
               </div>
               <button onClick={()=>delR(r.id)} style={{ fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
             </div>
-            <Row>
+            {!r.collapsed && <>
+            <Row cols={r.existingPC?2:3}>
               <Field label="Room / Location Name" tight><Input value={r.name} onChange={v=>updR(r.id,'name',v)} placeholder="e.g. Treatment Room 1, Reception…" /></Field>
-              {!r.existingPC && <Field label="Quantity" tight><Num value={r.qty} onChange={v=>updR(r.id,'qty',v)} min={1} /></Field>}
+              <Field label="Device Name" tight hint="Hostname / PC name"><Input value={r.deviceName||''} onChange={v=>updR(r.id,'deviceName',v)} placeholder="e.g. SURGERY1-PC, REC-01" /></Field>
+              {!r.existingPC && <Field label="Qty" tight><Num value={r.qty} onChange={v=>updR(r.id,'qty',v)} min={1} /></Field>}
             </Row>
 
             {/* Existing PC toggle — if on, hide device/monitor/peripherals */}
@@ -908,7 +942,15 @@ const Phase3 = ({ d, u }) => {
                       })}
                     </div>
                   </Field>
-                  <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="OS version, issues, imaging software installed, reuse potential…" /></Field>
+                  <Row>
+                    <Field label="Operating System" tight>
+                      <Select value={r.pcOs||''} onChange={v=>updR(r.id,'pcOs',v)}
+                        options={['Windows 11 Pro','Windows 11 Business','Windows 11 Home','Windows 10 Pro','Windows 10 Business','Windows 10 Home','Windows Server 2022','Windows Server 2019','Windows Server 2016','macOS','Other']}
+                        placeholder="Select OS…" />
+                    </Field>
+                    <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="Issues, imaging software, reuse potential…" /></Field>
+                  </Row>
+                  {r.pcOs && !r.pcOs.includes('Windows 11') && !r.pcOs.includes('Server') && <InfoBox type="alert">⚠️ {r.pcOs} — not Windows 11. Upgrade or replacement recommended before go-live.</InfoBox>}
                   <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
                     <Toggle checked={!!r.replacePC} onChange={v=>updR(r.id,'replacePC',v)}
                       label="Replace this computer"
@@ -1003,12 +1045,15 @@ const Phase3 = ({ d, u }) => {
               </>
             )}
             <Field label="Notes" tight><Input value={r.notes} onChange={v=>updR(r.id,'notes',v)} placeholder="Imaging software, peripheral devices, special requirements…" /></Field>
+            </>}
           </Card>
         );
       })}
-      <div style={{display:'flex',gap:10,marginBottom:22}}>
-        <button onClick={addR} style={{ flex:1, padding:'12px', borderRadius:10, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:14, cursor:'pointer' }}>+ Add Room</button>
-        <button onClick={()=>setShowImport(true)} style={{ padding:'12px 18px', borderRadius:10, border:`2px solid ${C.navyMid}`, background:C.navyMid, color:C.white, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>⬆ Import from ScreenConnect</button>
+      <div style={{display:'flex',gap:8,marginBottom:22,flexWrap:'wrap'}}>
+        <button onClick={addR} style={{ flex:1, minWidth:120, padding:'12px', borderRadius:10, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:14, cursor:'pointer' }}>+ Add Room</button>
+        <button onClick={()=>setShowImport(true)} style={{ padding:'12px 14px', borderRadius:10, border:`2px solid ${C.navyMid}`, background:C.navyMid, color:C.white, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>⬆ Import</button>
+        {rooms.length>1&&<button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:true})))} style={{ padding:'12px 12px', borderRadius:10, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontWeight:600, fontSize:12, cursor:'pointer' }}>⊟ Collapse All</button>}
+        {rooms.length>1&&<button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{ padding:'12px 12px', borderRadius:10, border:`1.5px solid ${C.border}`, background:'transparent', color:C.textSecondary, fontWeight:600, fontSize:12, cursor:'pointer' }}>⊞ Expand All</button>}
       </div>
 
       {(totalD>0||d.cameras||d.switchType||d.wifiAPs)&&(
@@ -1089,7 +1134,7 @@ const Phase3 = ({ d, u }) => {
             <Row>
               <Field label="Brand / Model" tight><Input value={xr.model||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,model:v}:x))} placeholder="e.g. Dürr VistaScan, Acteon Pspix2, Planmeca" /></Field>
               <Field label="Type" tight>
-                <Select value={xr.type||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,type:v}:x))} options={['Intraoral X-ray sensor','OPG (panoramic)','CBCT','OPG + CBCT combined','Other']} placeholder="Select type…" />
+                <Select value={xr.type||''} onChange={v=>u('xrayMachines',(d.xrayMachines||[]).map(x=>x.id===xr.id?{...x,type:v}:x))} options={['Intraoral X-ray sensor','OPG (panoramic)','CBCT','OPG + CBCT combined','Phosphor Plate Reader','Other']} placeholder="Select type…" />
               </Field>
             </Row>
             <Row>
@@ -1169,12 +1214,17 @@ const Phase3 = ({ d, u }) => {
         </div>
       )}
       <Field label="AP Mounting">
-        <div style={{ display:'flex', gap:8 }}>
-          {['Ceiling','Wall','Mixed'].map(o=>{
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          {['Ceiling','Wall','Mixed','Not mounted'].map(o=>{
             const a=d.apMount===o;
-            return <button key={o} onClick={()=>u('apMount',o)} style={{ flex:1, padding:'9px 8px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o}</button>;
+            return <button key={o} onClick={()=>u('apMount',o)} style={{ flex:1, minWidth:80, padding:'9px 8px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o}</button>;
           })}
         </div>
+        {d.apMount==='Not mounted' && (
+          <div style={{marginTop:8}}>
+            <Input value={d.apMountNotes||''} onChange={v=>u('apMountNotes',v)} placeholder="Describe AP placement — e.g. on desk in comms room, wall bracket in hallway…" />
+          </div>
+        )}
       </Field>
       <Field label="Floor Plan / WiFi Design" hint="Upload a floor plan image for reference during AP placement discussions.">
         <div style={{ marginBottom:8 }}>
@@ -1442,13 +1492,23 @@ const Phase4 = ({ d, u }) => {
       <Divider label="VoIP Phone Service" />
       <Toggle checked={!!d.voip} onChange={v=>u('voip',v)} label="VoIP phone service required" sub="Cloud phone system — no lock-in contracts." />
       {d.voip&&(
-        <Row style={{ marginTop:14 }}>
-          <Field label="Extensions / Licences" hint="Per user / extension"><Num value={d.voipLicences||''} onChange={v=>u('voipLicences',v)} /></Field>
-          <Field label="DDI / Phone Numbers"><Num value={d.ddiLines||''} onChange={v=>u('ddiLines',v)} /></Field>
-        </Row>
-      )}
-      {d.voip&&(
-        <Toggle checked={!!d.porting} onChange={v=>u('porting',v)} label="Number porting required" sub="Existing number(s) to be transferred" />
+        <div style={{marginTop:14}}>
+          <Row>
+            <Field label="Extensions / Licences" hint="Per user / extension"><Num value={d.voipLicences||''} onChange={v=>u('voipLicences',v)} /></Field>
+            <Field label="Total DID Lines"><Num value={d.ddiLines||''} onChange={v=>u('ddiLines',v)} /></Field>
+          </Row>
+          <Toggle checked={!!d.porting} onChange={v=>u('porting',v)} label="Number porting required" sub="Existing number(s) to be transferred to this service" />
+          {d.porting && (
+            <div style={{marginLeft:54,marginTop:8}}>
+              <Field label="Numbers to port" hint="List all DIDs / phone numbers being ported">
+                <Textarea value={d.portingNumbers||''} onChange={v=>u('portingNumbers',v)} rows={2} placeholder="e.g. 03 9123 4567, 03 9123 4568, 0412 345 678…" />
+              </Field>
+              <Field label="Current carrier / provider" tight>
+                <Input value={d.portingCarrier||''} onChange={v=>u('portingCarrier',v)} placeholder="e.g. Telstra, Optus, Vonex…" />
+              </Field>
+            </div>
+          )}
+        </div>
       )}
 
       {d.voip&&(
@@ -1556,7 +1616,7 @@ const Phase4 = ({ d, u }) => {
           <div key={h.model}>
             <HwRow label={h.model} qty={h.qty} onQty={v=>updHw('handsets',i,'qty',v)}
               notes={h.notes} onNotes={v=>updHw('handsets',i,'notes',v)} showNotes={h.model==='Other'}
-              showDeviceFields={h.model!=='Other'} devices={h.devices||[]} onDevices={v=>updHw('handsets',i,'devices',v)} />
+              showDeviceFields={h.model!=='Other'} devices={h.devices||[]} onDevices={v=>updHw('handsets',i,'devices',v)} existingQty={h.existingQty||''} onExistingQty={v=>updHw('handsets',i,'existingQty',v)} existingDevices={h.existingDevices||[]} onExistingDevices={v=>updHw('handsets',i,'existingDevices',v)} />
           </div>
         ))}
       </div>
@@ -1583,7 +1643,7 @@ const Phase4 = ({ d, u }) => {
           <div key={h.model}>
             <HwRow label={h.model} qty={h.qty} onQty={v=>updHw('cordless',i,'qty',v)}
               notes={h.notes} onNotes={v=>updHw('cordless',i,'notes',v)} showNotes={h.model==='Other'}
-              showDeviceFields={h.model!=='Other'} devices={h.devices||[]} onDevices={v=>updHw('cordless',i,'devices',v)} />
+              showDeviceFields={h.model!=='Other'} devices={h.devices||[]} onDevices={v=>updHw('cordless',i,'devices',v)} existingQty={h.existingQty||''} onExistingQty={v=>updHw('cordless',i,'existingQty',v)} existingDevices={h.existingDevices||[]} onExistingDevices={v=>updHw('cordless',i,'existingDevices',v)} />
           </div>
         ))}
       </div>
@@ -1656,7 +1716,13 @@ const Phase5 = ({ d, u, rooms }) => {
               <button onClick={()=>u('backupDevices',(d.backupDevices||[]).filter((_,x)=>x!==bi))} style={{color:C.red,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:700}}>Remove</button>
             </div>
             <Row>
-              <Field label="Device / PC Name" tight><Input value={bd.name||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,name:v}:x))} placeholder="e.g. SERVER-01, RECEPTION-PC" /></Field>
+              <Field label="Device / PC Name" tight hint="Select from your IT infrastructure or type manually">
+                {(d.rooms||[]).length>0
+                  ? <Select value={bd.name||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,name:v}:x))}
+                      options={[(d.rooms||[]).map(r=>r.deviceName||r.name).filter(Boolean),'Other — type manually'].flat()}
+                      placeholder="Select device…" />
+                  : <Input value={bd.name||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,name:v}:x))} placeholder="e.g. SERVER-01, RECEPTION-PC" />}
+              </Field>
               <Field label="Data Volume" tight>
                 <Select value={bd.dataVol||''} onChange={v=>u('backupDevices',(d.backupDevices||[]).map((x,i)=>i===bi?{...x,dataVol:v}:x))}
                   options={['Under 100GB','100–250GB','250–500GB','500GB–1TB','1–2TB','2–4TB','4–6TB','6–8TB','8TB+']} placeholder="Select data size…" />
@@ -2216,12 +2282,15 @@ ${d.risks}`:'',
       <PhaseHeader num={6} title="Practice Success Blueprint" sub="Your complete technology solution, tailored for your practice." />
 
       {/* Hero */}
-      <div style={{ background:`linear-gradient(135deg, ${C.navy} 0%, ${C.navyMid} 100%)`, borderRadius:16, padding:'28px 30px', marginBottom:24, position:'relative', overflow:'hidden' }}>
-        <div style={{ position:'absolute', top:-30, right:-30, width:180, height:180, borderRadius:'50%', background:'rgba(249,115,22,.08)' }}/>
-        <div style={{ position:'absolute', bottom:-50, right:60, width:120, height:120, borderRadius:'50%', background:'rgba(249,115,22,.05)' }}/>
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.12em', color:C.orange, textTransform:'uppercase', marginBottom:10, position:'relative' }}>Practice Success Blueprint</div>
-        <h3 style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:26, margin:'0 0 4px', color:C.white, position:'relative' }}>{d.practiceName||'Your Practice'}</h3>
-        <p style={{ margin:'0 0 18px', color:'#94A3B8', fontSize:15, position:'relative' }}>
+      <div style={{ background:"linear-gradient(135deg, #0F172A 0%, #1A2D45 60%, #0F172A 100%)", borderRadius:16, padding:"28px 30px", marginBottom:24, position:"relative", overflow:"hidden", borderTop:"3px solid #F97316" }}>
+        <svg style={{position:"absolute",top:0,right:0,width:"100%",height:"100%",opacity:.09,pointerEvents:"none"}} viewBox="0 0 400 200" preserveAspectRatio="xMaxYMid slice"><polygon points="330,10 370,10 390,44 370,78 330,78 310,44" fill="none" stroke="#F97316" strokeWidth="2"/><polygon points="356,58 396,58 416,92 396,126 356,126 336,92" fill="rgba(249,115,22,0.25)"/><polygon points="288,38 318,38 333,63 318,88 288,88 273,63" fill="none" stroke="#F97316" strokeWidth="1.5"/><polygon points="308,98 338,98 353,123 338,148 308,148 293,123" fill="none" stroke="#64748B" strokeWidth="1"/><polygon points="360,128 385,128 397,149 385,170 360,170 348,149" fill="none" stroke="#F97316" strokeWidth="1"/><polygon points="370,-12 410,-12 430,22 410,56 370,56 350,22" fill="none" stroke="#64748B" strokeWidth="1"/></svg>
+        <img src="data:image/png;base64,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" width="130" height="130" alt="" style={{objectFit:"contain",position:"absolute",bottom:-15,right:16,opacity:.15,pointerEvents:"none"}} />
+        <div style={{ fontSize:11, fontWeight:800, letterSpacing:".14em", color:C.orange, textTransform:"uppercase", marginBottom:10, position:"relative", display:"flex", alignItems:"center", gap:8 }}>
+          <svg width="14" height="14" viewBox="0 0 20 20"><polygon points="10,1 19,6 19,14 10,19 1,14 1,6" stroke="#F97316" strokeWidth="2" fill="rgba(249,115,22,.2)"/></svg>
+          Practice Success Blueprint
+        </div>
+        <h3 style={{ fontFamily:"Sora,sans-serif", fontWeight:800, fontSize:28, margin:"0 0 6px", color:C.white, position:"relative" }}>{d.practiceName||'Your Practice'}</h3>
+        <p style={{ margin:"0 0 18px", color:"#94A3B8", fontSize:15, position:"relative" }}>
           {d.principalDentist&&`${d.principalDentist} · `}{d.suburb}{d.state?`, ${d.state}`:''}{n(d.chairs)>0?` · ${d.chairs} chair${n(d.chairs)!==1?'s':''}`:''}</p>
         {(() => {
           const dateVal = d.practiceType==='new' ? d.openingDate : d.goLiveDate;
@@ -2811,25 +2880,12 @@ function App() {
 
           <div style={{ padding:'22px 20px 18px', borderBottom:'1px solid rgba(255,255,255,.07)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-              <div style={{ width:44, height:44, flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <svg viewBox="0 0 80 80" width="44" height="44" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect width="80" height="80" rx="14" fill="#F97316"/>
-                  <rect x="26" y="14" width="28" height="22" rx="6" fill="white"/>
-                  <circle cx="34" cy="23" r="3.5" fill="#F97316"/>
-                  <circle cx="46" cy="23" r="3.5" fill="#F97316"/>
-                  <rect x="38" y="27" width="4" height="5" rx="2" fill="#F97316"/>
-                  <rect x="18" y="38" width="44" height="28" rx="8" fill="white"/>
-                  <rect x="26" y="46" width="10" height="10" rx="3" fill="#F97316"/>
-                  <rect x="44" y="46" width="10" height="10" rx="3" fill="#F97316"/>
-                  <rect x="12" y="40" width="8" height="16" rx="4" fill="white"/>
-                  <rect x="60" y="40" width="8" height="16" rx="4" fill="white"/>
-                  <rect x="28" y="66" width="10" height="10" rx="3" fill="white"/>
-                  <rect x="42" y="66" width="10" height="10" rx="3" fill="white"/>
-                </svg>
+              <div style={{ width:48, height:48, flexShrink:0 }}>
+                <img src="data:image/png;base64,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" width="48" height="48" alt="32 Byte" style={{objectFit:"contain"}} />
               </div>
               <div>
-                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.white, lineHeight:1.2 }}>32 Byte</div>
-                <div style={{ fontSize:11, color:'#475569' }}>Dental IT Specialists</div>
+                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:16, color:C.white, lineHeight:1.2 }}>32 Byte</div>
+                <div style={{ fontSize:12, color:'#64748B' }}>Dental IT Specialists</div>
               </div>
             </div>
             <div style={{ fontSize:10, fontWeight:700, letterSpacing:'.1em', color:C.orange, textTransform:'uppercase', marginBottom:10 }}>Practice Success Blueprint</div>
@@ -2865,7 +2921,7 @@ function App() {
                         : <span style={{ fontSize:11, fontWeight:700, color:isA?C.orange:'#3D506B' }}>{i+1}</span>}
                   </div>
                   <div>
-                    <div style={{ fontSize:13, fontWeight:600, color:isA?C.white:outOfScope?'#3D506B':isDone?'#94A3B8':'#CBD5E1', fontFamily:'Sora,sans-serif', lineHeight:1.3, textDecoration:outOfScope?'line-through':'none' }}>{s.label}</div>
+                    <div style={{ fontSize:14, fontWeight:600, color:isA?C.white:outOfScope?'#3D506B':isDone?'#94A3B8':'#CBD5E1', fontFamily:'Sora,sans-serif', lineHeight:1.3, textDecoration:outOfScope?'line-through':'none' }}>{s.label}</div>
                     <div style={{ fontSize:11, color:isA?'#FED7AA':isDone?'#64748B':'#94A3B8', marginTop:1 }}>{outOfScope?'Not in scope':s.sub}</div>
                   </div>
                 </button>
