@@ -278,7 +278,8 @@ const HwRow = ({ label, model, qty, onQty, notes, onNotes, showNotes, devices, o
           <span style={{ fontSize:11, color:C.textMuted, whiteSpace:'nowrap' }}>Existing:</span>
           <div style={{ width:70 }}><Num value={existingQty||''} onChange={onExistingQty} /></div>
         </div>
-              {showNotes && count>0 && (
+      </div>
+      {showNotes && count>0 && (
         <div style={{marginLeft:10,padding:'6px 0'}}>
           <Input value={notes||''} onChange={onNotes} placeholder="Brand / Model (e.g. Cisco 8841, Polycom VVX)" />
         </div>
