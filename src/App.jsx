@@ -55,6 +55,65 @@ const DEVICE_OPTIONS = [
 ];
 
 const uid = () => Math.random().toString(36).slice(2,8);
+
+// ── CPU release year lookup ────────────────────────────────────────────────────
+const guessCpuYear = (cpu) => {
+  if(!cpu) return null;
+  const c = cpu.toUpperCase();
+  const now = new Date().getFullYear();
+
+  // Intel Core Ultra (Arrow Lake / Meteor Lake) — 2023-2024
+  if(c.includes('ULTRA')) return 2024;
+
+  // Intel Core i-series — extract generation from model number
+  // Pattern: i3/i5/i7/i9-XXXXX where first 2 digits = generation (>9) or 1 digit (<=9)
+  const intelMatch = c.match(/I[3579]-(\d{4,5})/);
+  if(intelMatch) {
+    const num = intelMatch[1];
+    const gen = num.length === 5 ? parseInt(num.slice(0,2)) : parseInt(num.slice(0,1));
+    const genYears = {1:2009,2:2011,3:2012,4:2013,5:2015,6:2015,7:2017,8:2018,9:2019,10:2020,11:2021,12:2022,13:2023,14:2024};
+    if(genYears[gen]) return genYears[gen];
+  }
+
+  // Intel 11th/12th/13th/14th gen text form
+  if(c.includes('14TH GEN')) return 2024;
+  if(c.includes('13TH GEN')) return 2023;
+  if(c.includes('12TH GEN')) return 2022;
+  if(c.includes('11TH GEN')) return 2021;
+  if(c.includes('10TH GEN')) return 2020;
+
+  // Intel Xeon
+  if(c.includes('XEON')) {
+    if(c.match(/W-2[0-9]{3}/)||c.match(/SILVER 4[12]/)) return 2019;
+    if(c.match(/E5-2[0-9]{3}/)) return 2013;
+    if(c.match(/E-2[0-9]{3}/)) return 2018;
+    if(c.match(/SILVER 42[0-9]{2}/)) return 2020;
+    return 2016;
+  }
+
+  // Intel Celeron / Pentium
+  if(c.includes('J4125')||c.includes('J4105')) return 2019;
+  if(c.includes('J6412')||c.includes('J6413')) return 2021;
+
+  // AMD Ryzen — extract series number
+  const amdMatch = c.match(/RYZEN\s+[357\s]+(\d)(\d{3})/);
+  if(amdMatch) {
+    const series = parseInt(amdMatch[1]);
+    const amdYears = {1:2017,2:2018,3:2019,4:2020,5:2020,6:2022,7:2022,8:2023,9:2024};
+    if(amdYears[series]) return amdYears[series];
+  }
+  // AMD Ryzen AI / 9000 series
+  if(c.includes('RYZEN AI')||c.match(/RYZEN\s+[357]\s+9\d{3}/)) return 2024;
+
+  return null;
+};
+
+const cpuAgeYears = (cpu) => {
+  const yr = guessCpuYear(cpu);
+  if(!yr) return null;
+  return new Date().getFullYear() - yr;
+};
+
 const n   = v  => parseInt(v)||0;
 
 // ── Primitives ─────────────────────────────────────────────────────────────────
@@ -505,18 +564,228 @@ const Phase2 = ({ d, u }) => {
 // ── Phase 3 ───────────────────────────────────────────────────────────────────
 const Phase3 = ({ d, u }) => {
   const rooms = d.rooms||[];
-  const addR  = () => u('rooms',[...rooms,{ id:uid(), name:'', deviceType:'practice', qty:1, monitor:'27" QHD', kbMouse:true, database:false, notes:'', existingPC:false, pcAge:'', pcBrand:'', pcCondition:'Functional', pcNotes:'' }]);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importPreview, setImportPreview] = useState([]);
+  const [importError, setImportError] = useState('');
+  const [importCompanies, setImportCompanies] = useState([]);
+  const [importCompany, setImportCompany] = useState('');
+  const [importAllRows, setImportAllRows] = useState([]);
+
+  const addR  = () => u('rooms',[...rooms,{ id:uid(), name:'', deviceType:'practice', qty:1, monitor:'No Monitor', kbMouse:false, database:false, notes:'', existingPC:false, pcAge:'', pcBrand:'', pcCondition:'Functional', pcNotes:'' }]);
   const updR  = (id,k,v) => u('rooms', rooms.map(x=>x.id===id?{...x,[k]:v}:x));
   const delR  = id => u('rooms', rooms.filter(x=>x.id!==id));
   const totalD = rooms.reduce((a,r)=>a+n(r.qty),0);
-  const newDevices = rooms.filter(r=>!r.existingPC).reduce((a,r)=>a+n(r.qty),0);
+  const newDevices = rooms.filter(r=>!r.existingPC || r.replacePC).reduce((a,r)=>a+n(r.qty),0);
   const networkingHrs = (d.switchType||d.wifiAPs||d.firewall||d.failover) ? 2 : 0;
   const cameraHrs = d.cameras ? (n(d.cameraCount)*0.25) : 0;
   const psHrs  = (newDevices * 2.5) + networkingHrs + cameraHrs;
   const notReq = d.q1req === false;
 
+  // Parse Datto RMM CSV or ScreenConnect JSON
+  const parseImport = (text) => {
+    setImportError('');
+    setImportCompany('');
+    setImportCompanies([]);
+    setImportAllRows([]);
+    setImportPreview([]);
+
+    if(!text.trim()) return;
+
+    // Detect CSV (has header row with commas)
+    if(text.includes('GuestOperatingSystemName') || text.includes('CustomProperty1')) {
+      // Datto RMM CSV
+      try {
+        const lines = text.trim().split('\n');
+        const headers = lines[0].split(',').map(h=>h.replace(/"/g,'').trim());
+        const rows = lines.slice(1).filter(l=>l.trim()).map(line=>{
+          // Handle quoted CSV values
+          const vals = []; let cur = ''; let inQ = false;
+          for(let i=0;i<line.length;i++){
+            if(line[i]==='"'){inQ=!inQ;}
+            else if(line[i]===','&&!inQ){vals.push(cur.trim());cur='';}
+            else cur+=line[i];
+          }
+          vals.push(cur.trim());
+          const obj = {};
+          headers.forEach((h,i)=>{ obj[h]=vals[i]||''; });
+          return obj;
+        });
+        const companies = [...new Set(rows.map(r=>r['CustomProperty1']||'').filter(Boolean))].sort();
+        setImportAllRows(rows);
+        setImportCompanies(companies);
+        if(companies.length===1) { setImportCompany(companies[0]); buildPreviewFromCSV(rows, companies[0]); }
+      } catch(e) {
+        setImportError('Could not parse CSV. Make sure you copied the full file content.');
+      }
+      return;
+    }
+
+    // ScreenConnect JSON (one JSON object per line)
+    const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+    const parsed = [];
+    for(const line of lines){
+      try { parsed.push(JSON.parse(line)); } catch(e) {}
+    }
+    if(!parsed.length){ setImportError('No valid data found. Paste the JSON output from ScreenConnect Run Command, or a Datto RMM CSV export.'); return; }
+    setImportPreview(parsed.map(obj=>({
+      name: obj.Name||obj.name||obj.ComputerName||'Unknown',
+      cpu:  obj.CPU||obj.cpu||obj.Processor||'',
+      ram:  obj.RAM||obj.ram||'',
+      storage: obj.Storage||obj.storage||'',
+      gpu:  obj.GPU||obj.gpu||'',
+      os:   obj.OS||obj.os||'',
+      model:'',
+    })));
+  };
+
+  const buildPreviewFromCSV = (rows, company) => {
+    const filtered = rows.filter(r=>(r['CustomProperty1']||'')=== company);
+    setImportPreview(filtered.map(r=>({
+      name:    r['Name']||r['GuestMachineName']||'Unknown',
+      cpu:     r['GuestProcessorName']||'',
+      ram:     r['GuestSystemMemoryTotalMegabytes'] ? Math.round(parseInt(r['GuestSystemMemoryTotalMegabytes'])/1024)+'GB' : '',
+      storage: '',
+      gpu:     '',
+      os:      r['GuestOperatingSystemName']||'',
+      model:   r['GuestMachineModel']||'',
+      serial:  r['GuestMachineSerialNumber']||'',
+    })));
+  };
+
+  const confirmImport = () => {
+    const newRooms = importPreview.map(dev => {
+      const hasGpu = dev.gpu && dev.gpu !== 'None' && dev.gpu !== '';
+      const gpuUp = (dev.gpu||'').toUpperCase();
+      let deviceType = 'practice';
+      if(gpuUp.includes('A2000')||gpuUp.includes('PRO 2000')) deviceType = 'iw-high';
+      else if(gpuUp.includes('A1000')||gpuUp.includes('PRO 1000')) deviceType = 'iw-mid';
+      else if(gpuUp.includes('A400')) deviceType = 'iw-entry';
+      else if(gpuUp.includes('RTX')||gpuUp.includes('QUADRO')||gpuUp.includes('NVIDIA')) deviceType = 'iw-mid';
+      // Clean up CPU string
+      const cpuClean = (dev.cpu||'').replace(/Intel\(R\)|Core\(TM\)|CPU|AMD|@/g,'').replace(/\s+/g,' ').trim();
+      return {
+        id: uid(),
+        name: dev.name,
+        deviceType,
+        qty: 1,
+        monitor: 'No Monitor',
+        kbMouse: false,
+        database: false,
+        notes: [dev.os?`OS: ${dev.os}`:'', dev.serial?`S/N: ${dev.serial}`:''].filter(Boolean).join(' | '),
+        existingPC: true,
+        pcBrand: dev.model || dev.name,
+        pcAge: '',
+        pcCondition: 'Functional',
+        pcNotes: '',
+        pcCpu: cpuClean,
+        pcAge: cpuAgeYears(cpuClean)?.toString() || '',
+        pcRam: dev.ram || '',
+        pcStorage: dev.storage || '',
+        pcHasGpu: hasGpu,
+        pcGpuModel: hasGpu ? dev.gpu : '',
+      };
+    });
+    u('rooms', [...rooms, ...newRooms]);
+    setShowImport(false);
+    setImportText(''); setImportPreview([]); setImportCompanies([]);
+    setImportCompany(''); setImportAllRows([]);
+  };
+
   return (
     <div>
+      {/* ScreenConnect Import Modal */}
+      {showImport && (
+        <div style={{position:'fixed',inset:0,background:'rgba(15,23,42,.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,padding:20}}>
+          <div style={{background:C.surface,borderRadius:16,width:'100%',maxWidth:680,maxHeight:'90vh',overflow:'hidden',display:'flex',flexDirection:'column',boxShadow:'0 25px 60px rgba(0,0,0,.4)'}}>
+            <div style={{padding:'20px 24px',borderBottom:`1px solid ${C.border}`,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+              <div>
+                <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:18,color:C.textPrimary}}>Import from ScreenConnect</div>
+                <div style={{fontSize:13,color:C.textSecondary,marginTop:2}}>Paste the PowerShell output from Run Command</div>
+              </div>
+              <button onClick={()=>{setShowImport(false);setImportText('');setImportPreview([]);setImportError('');setImportCompanies([]);setImportCompany('');setImportAllRows([]);}} style={{background:'none',border:'none',fontSize:20,color:C.textMuted,cursor:'pointer'}}>✕</button>
+            </div>
+            <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
+
+              {/* Two input methods */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:16}}>
+                {/* Datto RMM CSV */}
+                <div style={{background:C.navy,borderRadius:10,padding:'14px 16px'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>ScreenConnect CSV Export</div>
+                  <div style={{fontSize:12,color:C.textSecondary,lineHeight:1.7,marginBottom:12}}>
+                    In ScreenConnect → select all machines → <strong style={{color:C.textPrimary}}>More → Export CSV</strong>. Upload the whole file and pick the client below.
+                  </div>
+                  <label style={{display:'block',padding:'9px 14px',borderRadius:8,border:`2px dashed ${C.border}`,background:C.surfaceHi,color:C.orange,fontWeight:700,fontSize:13,cursor:'pointer',textAlign:'center'}}>
+                    📂 Upload CSV
+                    <input type="file" accept=".csv,.txt" style={{display:'none'}} onChange={e=>{
+                      const f=e.target.files[0]; if(!f) return;
+                      const r=new FileReader(); r.onload=ev=>{setImportText(ev.target.result);parseImport(ev.target.result);}; r.readAsText(f);
+                    }} />
+                  </label>
+                  {importText && importCompanies.length>0 && (
+                    <div style={{marginTop:10}}>
+                      <div style={{fontSize:11,fontWeight:700,color:C.textSecondary,marginBottom:6,textTransform:'uppercase',letterSpacing:'.06em'}}>{importCompanies.length} clients found — select one:</div>
+                      <div style={{maxHeight:180,overflowY:'auto',display:'flex',flexDirection:'column',gap:4}}>
+                        {importCompanies.map(c=>(
+                          <button key={c} onClick={()=>{setImportCompany(c);buildPreviewFromCSV(importAllRows,c);}}
+                            style={{padding:'7px 10px',borderRadius:7,border:`1.5px solid ${importCompany===c?C.orange:C.border}`,background:importCompany===c?C.orangeLight:C.surface,color:importCompany===c?C.orange:C.textSecondary,fontSize:12,fontWeight:importCompany===c?700:400,cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ScreenConnect JSON */}
+                <div style={{background:C.navy,borderRadius:10,padding:'14px 16px'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:8}}>ScreenConnect</div>
+                  <div style={{fontSize:12,color:C.textSecondary,lineHeight:1.7,marginBottom:8}}>
+                    Select machines → <strong style={{color:C.textPrimary}}>Run Command</strong> → paste and run:
+                  </div>
+                  <div style={{background:'rgba(0,0,0,.5)',borderRadius:7,padding:'8px 10px',fontFamily:'monospace',fontSize:10,color:'#93C5FD',lineHeight:1.5,wordBreak:'break-all',marginBottom:10,userSelect:'all'}}>
+                    {'$g=(Get-WmiObject Win32_VideoController|Where{$_.Name -notlike \'*Basic*\'-and$_.Name -notlike \'*Microsoft*\'}|Select -First 1).Name;[PSCustomObject]@{Name=$env:COMPUTERNAME;CPU=(Get-WmiObject Win32_Processor|Select -First 1).Name;RAM=[math]::Round((Get-WmiObject Win32_ComputerSystem).TotalPhysicalMemory/1GB).ToString()+\'GB\';Storage=([math]::Round((Get-WmiObject Win32_LogicalDisk -Filter "DeviceID=\'C:\'"| Select -First 1).Size/1GB)).ToString()+\'GB\';GPU=if($g){$g}else{\'None\'};OS=(Get-WmiObject Win32_OperatingSystem).Caption}|ConvertTo-Json -Compress'}
+                  </div>
+                  <textarea
+                    value={importCompanies.length>0?'':importText}
+                    onChange={e=>{setImportText(e.target.value);parseImport(e.target.value);}}
+                    placeholder={'Paste JSON output here…\n{"Name":"SURGERY1","CPU":"Intel i7","RAM":"16GB",...}'}
+                    style={{width:'100%',padding:'8px 10px',fontSize:12,borderRadius:7,border:`1.5px solid ${C.border}`,background:C.surfaceHi,color:C.textPrimary,fontFamily:'monospace',resize:'vertical',minHeight:80,outline:'none'}}
+                  />
+                </div>
+              </div>
+
+              {importError && <InfoBox type="alert">{importError}</InfoBox>}
+
+              {/* Preview */}
+              {importPreview.length>0 && (
+                <div>
+                  <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:14,color:C.textPrimary,marginBottom:10}}>
+                    {importPreview.length} device{importPreview.length!==1?'s':''} found{importCompany?' for '+importCompany:''} — review before importing
+                  </div>
+                  {importPreview.map((dev,i)=>(
+                    <div key={i} style={{background:C.surfaceHi,borderRadius:9,padding:'12px 14px',marginBottom:8,border:`1px solid ${C.border}`}}>
+                      <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:13,color:C.textPrimary,marginBottom:5}}>{dev.name}{dev.model&&dev.model!==dev.name?<span style={{fontWeight:400,color:C.textSecondary,fontSize:12}}> · {dev.model}</span>:''}</div>
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:6}}>
+                        {dev.cpu&&<div style={{fontSize:11,color:C.textSecondary}}>CPU: <span style={{color:C.textPrimary}}>{dev.cpu.replace(/Intel\(R\)|Core\(TM\)|CPU|@/g,'').replace(/\s+/g,' ').trim()}</span></div>}
+                        {dev.ram&&<div style={{fontSize:11,color:C.textSecondary}}>RAM: <span style={{color:C.textPrimary}}>{dev.ram}</span></div>}
+                        {dev.storage&&<div style={{fontSize:11,color:C.textSecondary}}>Disk: <span style={{color:C.textPrimary}}>{dev.storage}</span></div>}
+                        {dev.gpu&&dev.gpu!=='None'&&<div style={{fontSize:11,color:C.textSecondary}}>GPU: <span style={{color:C.orange}}>{dev.gpu}</span></div>}
+                        {dev.os&&<div style={{fontSize:11,color:C.textSecondary,gridColumn:'span 2'}}>OS: <span style={{color:C.textPrimary}}>{dev.os}</span></div>}
+                      </div>
+                    </div>
+                  ))}
+                  <InfoBox>Note: GPU and storage are not in the ScreenConnect CSV export — fill those in manually after import, or use the Run Command method on the right.</InfoBox>
+                  <button onClick={confirmImport} style={{width:'100%',padding:'13px',borderRadius:10,background:C.orange,color:C.white,border:'none',fontSize:15,fontWeight:700,cursor:'pointer',fontFamily:'Sora,sans-serif',marginTop:4}}>
+                    Import {importPreview.length} Device{importPreview.length!==1?'s':''} as Existing Computers →
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <PhaseHeader num={3} title="IT Infrastructure" sub="Room by room, then imaging equipment and networking." />
       {notReq && (
         <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:C.amberLight, border:`1.5px solid ${C.amberBorder}`, borderRadius:10, marginBottom:20 }}>
@@ -562,7 +831,8 @@ const Phase3 = ({ d, u }) => {
             {r.existingPC ? (
               /* ── Existing PC details ── */
               (() => {
-                const age = parseInt(r.pcAge)||0;
+                const inferredAge = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
+                const age = parseInt(r.pcAge) || inferredAge || 0;
                 const ageBorder = age>=5 ? C.red : age>=3 ? C.amber : C.border;
                 const ageBg = age>=5 ? 'rgba(239,68,68,.08)' : age>=3 ? 'rgba(245,158,11,.08)' : C.surfaceHi;
                 return (
@@ -570,10 +840,12 @@ const Phase3 = ({ d, u }) => {
                     <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:12 }}>Existing Computer Details</div>
                     <Row>
                       <Field label="Brand / Model" tight><Input value={r.pcBrand||''} onChange={v=>updR(r.id,'pcBrand',v)} placeholder="e.g. Dell OptiPlex, HP EliteDesk…" /></Field>
-                      <Field label="Age (years)" tight><Input type="number" value={r.pcAge||''} onChange={v=>updR(r.id,'pcAge',v)} placeholder="e.g. 3" /></Field>
+                      <Field label="Age (years)" tight hint={inferredAge&&!r.pcAge?`Auto-detected from CPU: ~${inferredAge} yrs`:'Override if you know the exact age'}>
+                        <Input type="number" value={r.pcAge||''} onChange={v=>updR(r.id,'pcAge',v)} placeholder={inferredAge?`~${inferredAge} (auto)`:'e.g. 3'} />
+                      </Field>
                     </Row>
-                    {age>=5 && <InfoBox type="alert">⚠️ Device is {age} years old — likely end of life. Recommend replacement and discuss with practice.</InfoBox>}
-                    {age>=3 && age<5 && <InfoBox type="warn">⚠️ Device is {age} years old — likely out of manufacturer warranty. Discuss support options with practice.</InfoBox>}
+                    {age>=5 && <InfoBox type="alert">⚠️ Device is ~{age} years old — likely end of life. Consider replacement.</InfoBox>}
+                    {age>=3 && age<5 && <InfoBox type="warn">⚠️ Device is ~{age} years old — likely out of manufacturer warranty. Discuss support options.</InfoBox>}
                     <Row>
                       <Field label="CPU Model" tight><Input value={r.pcCpu||''} onChange={v=>updR(r.id,'pcCpu',v)} placeholder="e.g. Intel Core i7-12700, AMD Ryzen 7 5800X" /></Field>
                       <Field label="RAM" tight>
@@ -598,10 +870,59 @@ const Phase3 = ({ d, u }) => {
                       </div>
                     </Field>
                     <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="OS version, issues, imaging software installed, reuse potential…" /></Field>
+                    {/* Replace toggle */}
+                    <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+                      <Toggle checked={!!r.replacePC} onChange={v=>updR(r.id,'replacePC',v)}
+                        label="Replace this computer"
+                        sub={r.replacePC?'Select replacement below — existing details kept for handover':'Keep existing computer, no replacement required'} />
+                    </div>
                   </div>
                 );
               })()
-            ) : (
+            }
+            {/* Replacement device options — shown when replacePC is true */}
+            {r.existingPC && r.replacePC && (
+              <div style={{marginTop:10,padding:'14px 16px',background:C.orangeLight,borderRadius:9,border:`1.5px solid ${C.orangeBorder}`}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Replacement Device</div>
+                <Field label="Device Type" tight>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {DEVICE_OPTIONS.map(o=>{
+                      const a=r.deviceType===o.v;
+                      return (
+                        <button key={o.v} onClick={()=>updR(r.id,'deviceType',o.v)}
+                          style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 14px', borderRadius:8, border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, cursor:'pointer', textAlign:'left' }}>
+                          <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${a?C.orange:C.gray400}`, background:a?C.orange:'transparent', flexShrink:0 }}/>
+                          <div>
+                            <div style={{ fontSize:13, fontWeight:700, color:a?C.orange:C.textPrimary }}>{o.label}</div>
+                            <div style={{ fontSize:11, color:C.textMuted, marginTop:1 }}>{o.sub}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+                <Row>
+                  <Field label="Monitor" tight>
+                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                      {MONITOR_OPTS.map(mo=>{
+                        const a=r.monitor===mo;
+                        return <button key={mo} onClick={()=>updR(r.id,'monitor',mo)} style={{ padding:'8px 12px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary, textAlign:'left' }}>{mo}</button>;
+                      })}
+                    </div>
+                  </Field>
+                  <Field label="Peripherals" tight>
+                    <div style={{ marginBottom:10 }}>
+                      <Toggle checked={r.kbMouse} onChange={v=>updR(r.id,'kbMouse',v)} label="Wireless Keyboard & Mouse" sub="Logitech MK345" />
+                    </div>
+                    {dev.imaging && (
+                      <Toggle checked={r.database} onChange={v=>updR(r.id,'database',v)} label="RAID Storage Required"
+                        sub={r.database?'2 × NVMe SSD in RAID array — local database':'Cloud-based / no local DB'} />
+                    )}
+                  </Field>
+                </Row>
+              </div>
+            )}
+            {!r.existingPC && (
               /* ── New device options ── */
               <>
                 <Field label="Device Type" tight>
@@ -646,7 +967,10 @@ const Phase3 = ({ d, u }) => {
           </Card>
         );
       })}
-      <button onClick={addR} style={{ width:'100%', padding:'12px', borderRadius:10, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:14, cursor:'pointer', marginBottom:22 }}>+ Add Room</button>
+      <div style={{display:'flex',gap:10,marginBottom:22}}>
+        <button onClick={addR} style={{ flex:1, padding:'12px', borderRadius:10, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:14, cursor:'pointer' }}>+ Add Room</button>
+        <button onClick={()=>setShowImport(true)} style={{ padding:'12px 18px', borderRadius:10, border:`2px solid ${C.navyMid}`, background:C.navyMid, color:C.white, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>⬆ Import from ScreenConnect</button>
+      </div>
 
       {(totalD>0||d.cameras||d.switchType||d.wifiAPs)&&(
         <div style={{ background:C.navy, borderRadius:12, padding:'14px 18px', marginBottom:22 }}>
@@ -1263,58 +1587,55 @@ const Phase5 = ({ d, u, rooms }) => {
       </Card>
 
       <Divider label="Backup & Disaster Recovery" />
-      <InfoBox>Select one backup approach — BCDR includes cloud replication, so only one option is required.</InfoBox>
-      <div style={{ display:'flex', gap:8, marginBottom:14 }}>
-        {[
-          {v:'none',    l:'None'},
-          {v:'bcdr',    l:'Datto BCDR Appliance'},
-          {v:'cloud',   l:'Cloud Backup Only'},
-        ].map(o=>{
-          const a=(d.backupType||'none')===o.v;
-          return <button key={o.v} onClick={()=>{u('backupType',o.v);u('datto',o.v==='bcdr');u('cloudBackup',o.v==='cloud');}}
-            style={{flex:1,padding:'10px 8px',borderRadius:9,fontSize:13,fontWeight:600,cursor:'pointer',border:`2px solid ${a?C.orange:C.border}`,background:a?C.orangeLight:C.surface,color:a?C.orange:C.textSecondary,fontFamily:'inherit'}}>{o.l}</button>;
-        })}
+      <InfoBox>Select all that apply. BCDR includes local appliance + cloud replication. Cloud backup is cloud-only.</InfoBox>
+      <div style={{display:'flex',flexDirection:'column',gap:12,marginBottom:14}}>
+        <Toggle checked={!!d.datto} onChange={v=>{u('datto',v);if(v)u('backupType','bcdr');}} label="Datto Siris BCDR Appliance" sub="On-premise backup + automated cloud replication. Hardware included on 36-month term." />
+        {d.datto && (
+          <div style={{marginLeft:54,padding:'14px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Datto BCDR Sizing</div>
+            <Row>
+              <Field label="Estimated Data Volume" tight hint="Total data to be backed up">
+                <Select value={d.dattoDataVolume||''} onChange={v=>u('dattoDataVolume',v)} placeholder="Select volume…"
+                  options={['Under 2TB','2TB','3TB','4TB','6TB','8TB','12TB','18TB','24TB','36TB+']} />
+              </Field>
+              <Field label="Devices to back up" tight>
+                <Num value={d.dattoDeviceCount||''} onChange={v=>u('dattoDeviceCount',v)} />
+              </Field>
+            </Row>
+            {d.dattoDataVolume && (() => {
+              const vol = d.dattoDataVolume;
+              let model = 'S6-X', mn = '2TB · Micro desktop';
+              if(vol==='Under 2TB'||vol==='2TB')  { model='S6-X';  mn='2TB · Micro desktop'; }
+              if(vol==='3TB')                      { model='S6-3';  mn='3TB · 1U rack · short depth'; }
+              if(vol==='4TB')                      { model='S6-4';  mn='4TB · 1U rack · short depth'; }
+              if(vol==='6TB')                      { model='S6-6';  mn='6TB · 1U rack · short depth'; }
+              if(vol==='8TB')                      { model='S6-8';  mn='8TB · 1U rack · short depth'; }
+              if(vol==='12TB')                     { model='S6-12'; mn='12TB · 1U rack · full depth'; }
+              if(vol==='18TB')                     { model='S6-18'; mn='18TB · 1U rack · full depth'; }
+              if(vol==='24TB')                     { model='S6-24'; mn='24TB · 1U rack · full depth'; }
+              if(vol==='36TB+')                    { model='S6-36'; mn='36TB · 1U rack · full depth'; }
+              return (
+                <div style={{background:C.orangeLight,border:`1.5px solid ${C.orangeBorder}`,borderRadius:9,padding:'12px 16px',marginTop:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Recommended Model</div>
+                  <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:C.textPrimary}}>Datto Siris {model}</div>
+                  <div style={{fontSize:13,color:C.textSecondary,marginTop:2}}>{mn}</div>
+                </div>
+              );
+            })()}
+            <Field label="BCDR Notes" tight>
+              <Textarea value={d.dattoNotes||''} onChange={v=>u('dattoNotes',v)} rows={2} placeholder="RPO/RTO requirements, virtualisation needs, special retention…" />
+            </Field>
+          </div>
+        )}
+        <Toggle checked={!!d.cloudBackup} onChange={v=>u('cloudBackup',v)} label="Standalone Cloud Backup" sub="Cloud-only backup. Suitable for fully cloud-based practices." />
+        {d.cloudBackup && (
+          <div style={{marginLeft:54,padding:'12px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`}}>
+            <Field label="Cloud Backup Notes" tight>
+              <Textarea value={d.cloudBackupNotes||''} onChange={v=>u('cloudBackupNotes',v)} rows={2} placeholder="What needs to be covered — M365, file server, workstations…" />
+            </Field>
+          </div>
+        )}
       </div>
-      {(d.backupType||'none')==='bcdr' && (
-        <div style={{background:C.surfaceHi,borderRadius:10,padding:'14px 16px',border:`1.5px solid ${C.border}`,marginBottom:14}}>
-          <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Datto BCDR Sizing</div>
-          <Row>
-            <Field label="Estimated Data Volume (TB)" tight hint="Total data across all devices to be backed up">
-              <Select value={d.dattoDataVolume||''} onChange={v=>u('dattoDataVolume',v)} placeholder="Select volume…"
-                options={['Under 2TB','2TB','3TB','4TB','6TB','8TB','12TB','18TB','24TB','36TB+']} />
-            </Field>
-            <Field label="Devices to back up" tight>
-              <Num value={d.dattoDeviceCount||''} onChange={v=>u('dattoDeviceCount',v)} />
-            </Field>
-          </Row>
-          {d.dattoDataVolume && (() => {
-            const vol = d.dattoDataVolume;
-            let model = 'S6-X', notes = '2TB · Micro desktop · Entry level';
-            if(vol==='Under 2TB'||vol==='2TB')  { model='S6-X';  notes='2TB · Micro desktop'; }
-            if(vol==='3TB')                      { model='S6-3';  notes='3TB · 1U rack · short depth'; }
-            if(vol==='4TB')                      { model='S6-4';  notes='4TB · 1U rack · short depth'; }
-            if(vol==='6TB')                      { model='S6-6';  notes='6TB · 1U rack · short depth'; }
-            if(vol==='8TB')                      { model='S6-8';  notes='8TB · 1U rack · short depth'; }
-            if(vol==='12TB')                     { model='S6-12'; notes='12TB · 1U rack · full depth'; }
-            if(vol==='18TB')                     { model='S6-18'; notes='18TB · 1U rack · full depth'; }
-            if(vol==='24TB')                     { model='S6-24'; notes='24TB · 1U rack · full depth'; }
-            if(vol==='36TB+')                    { model='S6-36'; notes='36TB · 1U rack · full depth'; }
-            return (
-              <div style={{background:C.orangeLight,border:`1.5px solid ${C.orangeBorder}`,borderRadius:9,padding:'12px 16px',marginTop:8}}>
-                <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>Recommended Model</div>
-                <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:C.textPrimary}}>Datto Siris {model}</div>
-                <div style={{fontSize:13,color:C.textSecondary,marginTop:2}}>{notes}</div>
-              </div>
-            );
-          })()}
-          <Field label="BCDR Notes" tight>
-            <Textarea value={d.dattoNotes||''} onChange={v=>u('dattoNotes',v)} rows={2} placeholder="RPO/RTO requirements, virtualisation needs, special retention…" />
-          </Field>
-        </div>
-      )}
-      {(d.backupType||'none')==='cloud' && (
-        <InfoBox>Cloud-only backup — suitable for fully cloud-based practices with no local servers or large imaging databases.</InfoBox>
-      )}
       <Divider label="Cyber Liability Insurance" />
       <InfoBox>Capture the practice's existing cyber insurance details — important context for our Advanced Cyber Security recommendations.</InfoBox>
       <Row>
@@ -1723,22 +2044,98 @@ ${d.notes?`MEETING NOTES\n${'─'.repeat(40)}\n${d.notes}`:''}`}
                       const ejs=await loadEmailJS();
                       const autoEP=rooms.reduce((a,r)=>a+n(r.qty),0);
                       const ep=n(d.endpoints)||autoEP;
+                      const fmtD = s => s?new Date(s+'T00:00:00').toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}):'—';
+                      const fullSummary = [
+`PRACTICE SUCCESS BLUEPRINT — INTERNAL BRIEF`,
+`${'═'.repeat(60)}`,
+`Practice: ${d.practiceName||'—'} | ${[d.suburb,d.state].filter(Boolean).join(', ')||'—'}`,
+`${d.practiceType==='new'?`Opening: ${fmtD(d.openingDate)} | Fitout: ${fmtD(d.fitoutDate)}`:`Go-Live: ${fmtD(d.goLiveDate)}`}`,
+`PMS: ${d.pms||(d.pmsOther||'—')} | Finance: ${d.financeProvider||'None'}`,
+`Imaging SW: ${(d.imagingSw||[]).join(', ')||'—'}`,
+`Sales Rep: ${d.salesRep||'—'} | Meeting: ${fmtD(d.meetingDate)}`,
+`Contact: ${d.contactName||'—'} | ${d.contactEmail||'—'} | Chairs: ${d.chairs||'—'}`,
+``,
+`SOLUTIONS IN SCOPE`,
+`${'─'.repeat(40)}`,
+[d.q1req!==false&&`✅ S1 — Hardware${d.q1url?'
+   '+d.q1url:''}`,d.q2req!==false&&`✅ S2 — Telecoms${d.q2url?'
+   '+d.q2url:''}`,d.q3req!==false&&`✅ S3 — MSA${d.q3url?'
+   '+d.q3url:''}`].filter(Boolean).join('
+'),
+``,
+`IT INFRASTRUCTURE`,
+`${'─'.repeat(40)}`,
+rooms.map(r=>{const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];return r.existingPC?`${r.name||'Room'}: EXISTING PC — ${r.pcBrand||'TBC'} | Age: ${r.pcAge||'?'} yrs | CPU: ${r.pcCpu||'?'} | RAM: ${r.pcRam||'?'} | Storage: ${r.pcStorage||'?'}${r.pcHasGpu?' | GPU: '+r.pcGpuModel:''}` :`${r.name||'Room'}: ${dev.label} × ${n(r.qty)}${r.database?' [RAID]':''}${r.monitor&&r.monitor!=='No Monitor'?' · '+r.monitor:''}${r.kbMouse?' · KB+Mouse':''}`;}).join('
+')||'No rooms',
+`Switch: ${d.switchType||'—'} | APs: ${d.wifiAPs||'0'}× (${d.apMount||'TBC'} mount) | Existing network: ${d.existingNetwork?'Yes':'No'}`,
+`Firewall: ${d.firewall?'UDM Pro':'None'} | 4G Failover: ${d.failover?'Teltonika TRB140':'None'}`,
+d.cameras?`Cameras: ${d.cameraCount||'?'}× · NVR: ${d.nvrStorage||'TBC'}`:'Cameras: None',
+`M365: ${[d.m365Premium&&`${d.m365Premium}× Business Premium`,d.m365F1&&`${d.m365F1}× F1`].filter(Boolean).join(', ')||'—'}`,
+d.existingM365&&(d.m365Users||[]).length>0?`M365 Users (${(d.m365Users||[]).length}): `+(d.m365Users||[]).map(u=>`${u.name||'?'} (${u.licence||u.licenceOther||'?'})`).join(', '):'',
+``,
+`IMAGING EQUIPMENT`,
+`${'─'.repeat(40)}`,
+(d.intraoralScanners||[]).length>0?(d.intraoralScanners||[]).map((s,i)=>`Intraoral ${i+1}: ${s.model||'TBC'} | SW: ${s.software||'—'}${s.installed?' [EXISTING]':''}${s.dedicated?' [dedicated PC]':''}${s.database?' [RAID — DB: '+s.dbDeviceName+']':''}`).join('
+'):'No intraoral scanners',
+(d.xrayMachines||[]).length>0?(d.xrayMachines||[]).map((x,i)=>`X-ray ${i+1}: ${x.model||'TBC'} (${x.type||'TBC'}) | SW: ${x.software||'—'} | ${x.timing||'timing TBC'}${x.installed?' [EXISTING]':''}${x.database?' [RAID — DB: '+x.dbDeviceName+']':''}`).join('
+'):'No X-ray machines',
+(d.otherImaging||[]).map((o,i)=>`Other ${i+1}: ${o.desc||'TBC'}`).join('
+'),
+``,
+`EXTERNAL VENDORS`,
+`${'─'.repeat(40)}`,
+(d.vendors||[]).length>0?(d.vendors||[]).map(v=>`${v.type||(v.customType||'Vendor')}: ${v.company||'—'} | ${v.contact||'—'} | ${v.phone||'—'} | ${v.email||'—'} | Install: ${v.installResp||'TBD'}`).join('
+'):'None captured',
+``,
+`TELECOMS`,
+`${'─'.repeat(40)}`,
+`Internet: ${d.internetType==='nbn'?'Business NBN '+d.nbnTier:d.internetType==='fibre'?'Private Fibre '+d.fibreSpeed:d.internetType||'TBC'} | 4G SIM: ${d.sim4g?'Yes':'No'}`,
+`VoIP: ${d.voip?`${d.voipLicences||'?'} licences${d.porting?' · porting required':''}`:'No'}`,
+d.callFlowType?`Call flow: ${d.callFlowType==='default'?'Default dental':'Custom'} | Greeting: ${d.callFlowGreeting||'—'}`:'',
+[...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Handset × ${h.qty}`),
+ ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Headset × ${h.qty}`),
+ ...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Cordless × ${h.qty}`)].join(' | ')||'No hardware',
+``,
+`MANAGED SERVICES`,
+`${'─'.repeat(40)}`,
+`TotalCare MSA: ${ep} endpoints | Advanced Cyber: ${d.advancedCyber?'Yes':'No'}`,
+`BCDR: ${d.datto?`Datto Siris${d.dattoDataVolume?' · '+d.dattoDataVolume:''}${d.dattoDeviceCount?' · '+d.dattoDeviceCount+' devices':''}` :'No'} | Cloud Backup: ${d.cloudBackup?'Yes':'No'}`,
+d.cyberInsurer?`Cyber Insurance: ${d.cyberInsurer}${d.cyberPolicyNumber?' | '+d.cyberPolicyNumber:''}${d.cyberExpiry?' | Expires: '+fmtD(d.cyberExpiry):''}` :'',
+``,
+d.notes?`MEETING NOTES
+${'─'.repeat(40)}
+${d.notes}`:'',
+d.actionPoints?`
+ACTION POINTS
+${'─'.repeat(40)}
+${d.actionPoints}`:'',
+d.followUps?`
+FOLLOW-UPS REQUIRED
+${'─'.repeat(40)}
+${d.followUps}`:'',
+d.risks?`
+RISKS & NOTES
+${'─'.repeat(40)}
+${d.risks}`:'',
+                      ].filter(v=>v!==false&&v!==null&&v!==undefined&&v!=='').join('
+');
+
+                      // Build base64 JSON attachment
+                      const exportJson = JSON.stringify({...d, _exportDate: new Date().toISOString()}, null, 2);
+                      const b64 = btoa(unescape(encodeURIComponent(exportJson)));
+
                       await ejs.send(EMAILJS_SERVICE_ID,'template_k2an72p',{
-                        to_email:d.internalTeamEmail,
-                        practice:d.practiceName||'New Practice',
-                        sales_rep:d.salesRep||'—',
-                        go_live:d.practiceType==='new'?(d.openingDate||'TBD'):(d.goLiveDate||'TBD'),
-                        practice_type:d.practiceType==='new'?'New build':'Existing / fit-out',
-                        summary: `Practice: ${d.practiceName||'—'}, ${d.suburb||''} ${d.state||''}
-PMS: ${d.pms||'—'} | Contact: ${d.contactName||'—'} | ${d.contactEmail||'—'}
-Solutions: ${[d.q1req!==false&&'S1 Hardware',d.q2req!==false&&'S2 Telco',d.q3req!==false&&'S3 MSA'].filter(Boolean).join(', ')}
-Devices: ${rooms.map(r=>{const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];return`${r.name||'Room'}: ${dev.label} ×${n(r.qty)}`;}).join(' | ')||'—'}
-Endpoints: ${ep} | Advanced Cyber: ${d.advancedCyber?'Yes':'No'} | BCDR: ${d.datto?'Yes':'No'}
-Vendors: ${(d.vendors||[]).map(v=>`${v.company||v.type}`).join(', ')||'None'}
-${d.notes?'Notes: '+d.notes:''}`,
+                        to_email: d.internalTeamEmail,
+                        practice: d.practiceName||'New Practice',
+                        sales_rep: d.salesRep||'—',
+                        go_live: d.practiceType==='new'?(fmtD(d.openingDate)||'TBD'):(fmtD(d.goLiveDate)||'TBD'),
+                        practice_type: d.practiceType==='new'?'New build':'Existing / fit-out',
+                        summary: fullSummary,
+                        export_filename: `blueprint-${(d.practiceName||'draft').replace(/\s+/g,'-')}-${new Date().toISOString().slice(0,10)}.json`,
+                        export_data: b64,
                       });
                       setInternalSent(true);
-                    }catch(e){alert('Failed to send. Check your internal EmailJS template ID.');}
+                    }catch(e){console.error(e);alert('Failed to send: '+e.message);}
                     setInternalSending(false);
                   }}
                   style={{ flex:2, padding:'10px', borderRadius:8, background:internalSent?C.green:C.navyMid, color:C.white, border:'none', fontSize:13, fontWeight:700, cursor:!d.internalTeamEmail||internalSending||internalSent?'default':'pointer', opacity:!d.internalTeamEmail?.6:1, fontFamily:'Sora,sans-serif' }}>
@@ -1784,8 +2181,10 @@ ${d.notes?'Notes: '+d.notes:''}`,
         <SumSection title="IT Infrastructure">
           {(rooms||[]).map(r=>{
             const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
-            const rowVal = r.existingPC
+            const rowVal = r.existingPC && !r.replacePC
               ? `Existing PC — ${r.pcBrand||'TBC'}${r.pcAge?' ('+r.pcAge+' yrs)':''}${r.pcCpu?' · '+r.pcCpu:''}${r.pcRam?' · '+r.pcRam:''}${r.pcStorage?' · '+r.pcStorage:''}${r.pcCondition?' · '+r.pcCondition:''}`
+              : r.existingPC && r.replacePC
+              ? `Replace with ${dev.label} × ${n(r.qty)} (replacing: ${r.pcBrand||'existing PC'})`
               : `${dev.label} × ${n(r.qty)}${r.database?' + RAID':''}${r.monitor&&r.monitor!=='No Monitor'?` · ${r.monitor}`:''}${r.kbMouse?' · KB+Mouse':''}`;
             return <SumRow key={r.id} label={r.name||'Room'} value={rowVal} />;
           })}
@@ -1837,8 +2236,8 @@ ${d.notes?'Notes: '+d.notes:''}`,
         <Textarea value={d.notes||''} onChange={v=>u('notes',v)} rows={3} disabled={!!locked}
           placeholder="Anything discussed that should appear in the client summary or follow-up email…" />
       </Field>
-      <Divider label="Action Points, Follow-ups & Risks" />
-      <InfoBox>Internal use only — not shown to the client. Included in the internal team summary.</InfoBox>
+      {!locked && <Divider label="Action Points, Follow-ups & Risks" />}
+      {!locked && <InfoBox>Internal use only — not shown to the client. Included in the internal team summary.</InfoBox>}
       <Field label="Action Points" hint="What needs to happen immediately after this meeting?">
         <Textarea value={d.actionPoints||''} onChange={v=>u('actionPoints',v)} rows={3} disabled={!!locked} placeholder="e.g. Build quotes in KQM, contact builder re cabling, confirm M365 tenant details…" />
       </Field>
@@ -1848,9 +2247,11 @@ ${d.notes?'Notes: '+d.notes:''}`,
       <Field label="Risks & Notes" hint="Anything that could affect the project timeline or scope">
         <Textarea value={d.risks||''} onChange={v=>u('risks',v)} rows={3} disabled={!!locked} placeholder="e.g. Medfin quote format required, imaging vendor expects to install software…" />
       </Field>
-      <Field label="Internal Team Email" hint="Used for the internal summary — add before locking">
-        <Input type="email" value={d.internalTeamEmail||''} onChange={v=>u('internalTeamEmail',v)} placeholder="team@32byte.com.au" disabled={!!locked} />
-      </Field>
+      {!locked && (
+        <Field label="Internal Team Email" hint="Used for the internal summary — add before locking">
+          <Input type="email" value={d.internalTeamEmail||''} onChange={v=>u('internalTeamEmail',v)} placeholder="team@32byte.com.au" />
+        </Field>
+      )}
 
       {/* KQM Links */}
       <Divider label="KQM Quote Links (Internal)" />
@@ -1868,6 +2269,66 @@ ${d.notes?'Notes: '+d.notes:''}`,
           </div>
         ))}
       </div>
+
+      {/* Incomplete items checker */}
+      {(() => {
+        const warnings = [];
+        // Imaging DB device names
+        (d.intraoralScanners||[]).forEach((s,i)=>{ if(s.database && !s.dbDeviceName) warnings.push(`Intraoral Scanner ${i+1}: database device name not entered`); });
+        (d.xrayMachines||[]).forEach((x,i)=>{ if(x.database && !x.dbDeviceName) warnings.push(`X-ray Machine ${i+1}: database device name not entered`); });
+        // Existing IT provider details
+        if(d.practiceType==='existing' && d.existingIT) {
+          if(!d.existingITCompany) warnings.push('Existing IT provider: company name missing');
+          ['existingITManagesDevices','existingITManagesEmail','existingITManagesPhones','existingITManagesInternet','existingITManagesSecurity'].forEach(k=>{
+            if(d[k]===false){
+              const labels={existingITManagesDevices:'Devices',existingITManagesEmail:'Email',existingITManagesPhones:'Phones',existingITManagesInternet:'Internet',existingITManagesSecurity:'Security'};
+              const subK={existingITManagesDevices:'existingITDevices',existingITManagesEmail:'existingITEmail_',existingITManagesPhones:'existingITPhones',existingITManagesInternet:'existingITInternet',existingITManagesSecurity:'existingITSecurity'};
+              const sub = d[subK[k]];
+              if(!sub||!sub.company) warnings.push(`${labels[k]}: responsible party not captured`);
+            }
+          });
+        }
+        // Handset details
+        (d.handsets||[]).forEach(h=>{
+          if(n(h.qty)>0 && h.model!=='Other'){
+            const missing = Array.from({length:n(h.qty)}).filter((_,i)=>!(h.devices||[])[i]?.extension).length;
+            if(missing>0) warnings.push(`${h.model} handsets: ${missing} device${missing!==1?'s':''} missing extension details`);
+          }
+        });
+        (d.cordless||[]).forEach(h=>{
+          if(n(h.qty)>0 && h.model!=='Other'){
+            const missing = Array.from({length:n(h.qty)}).filter((_,i)=>!(h.devices||[])[i]?.extension).length;
+            if(missing>0) warnings.push(`${h.model} cordless: ${missing} device${missing!==1?'s':''} missing extension details`);
+          }
+        });
+        // BCDR sizing
+        if(d.datto && !d.dattoDataVolume) warnings.push('BCDR Appliance: data volume not selected — cannot recommend Datto model');
+        // M365 existing
+        if(d.existingM365 && (d.m365Users||[]).length===0) warnings.push('M365: existing licences flagged but no users captured');
+        // Camera layout
+        if(d.cameras && n(d.cameraCount)>0 && !d.cameraLayoutImage) warnings.push('Security cameras: no layout/location diagram uploaded');
+        // Missing contact email
+        if(!d.contactEmail) warnings.push('No client email address — cannot send follow-up email');
+
+        if(!warnings.length) return null;
+        return (
+          <div style={{marginBottom:20}}>
+            <div style={{background:'rgba(245,158,11,.12)',border:`1.5px solid ${C.amber}`,borderRadius:12,padding:'16px 18px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}>
+                <span style={{fontSize:18}}>⚠️</span>
+                <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:14,color:C.amber}}>Additional information may be required</div>
+              </div>
+              <div style={{fontSize:13,color:'#FDE68A',marginBottom:10,lineHeight:1.5}}>The following items were not fully completed. Follow up with the practice before finalising quotes.</div>
+              {warnings.map((w,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'5px 0',borderTop:i>0?`1px solid rgba(245,158,11,.2)`:'none'}}>
+                  <span style={{color:C.amber,fontSize:13,flexShrink:0,marginTop:1}}>•</span>
+                  <span style={{fontSize:13,color:'#FDE68A'}}>{w}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Lock */}
       {!locked
@@ -2028,7 +2489,7 @@ const INIT = {
   // Call flow
   callFlowType:'default', callFlowGreeting:'', callFlowHuntGroup:'', callFlowAfterHours:'', callFlowOverflow:'', callFlowVoicemailEmail:'', callFlowNotes:'',
   existing4G:false, existing4GModel:'', existing4GProvider:'', existing4GManagedBy:'',
-  backupType:'none', dattoDataVolume:'', dattoDeviceCount:'', dattoNotes:'',
+  backupType:'none', dattoDataVolume:'', dattoDeviceCount:'', dattoNotes:'', cloudBackupNotes:'',
   actionPoints:'', followUps:'', risks:'',
   callFlowImage:null, callFlowFileName:'',
   existingM365:false, m365Users:[], m365Tenant:'',
