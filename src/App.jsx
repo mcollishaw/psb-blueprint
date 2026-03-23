@@ -2516,20 +2516,6 @@ const PasswordGate = ({ onAuth }) => {
       }
     }
   };
-      sessionStorage.setItem(AUTH_KEY, '1');
-      onAuth();
-    } else {
-      const next = attempts + 1;
-      setAttempts(next);
-      setVal('');
-      if(next >= 5) {
-        setLocked(true);
-        setError('Too many incorrect attempts. Close and reopen the tab to try again.');
-      } else {
-        setError(`Incorrect password. ${5 - next} attempt${5-next!==1?'s':''} remaining.`);
-      }
-    }
-  };
 
   return (
     <div style={{ height:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:C.bg, fontFamily:'DM Sans,sans-serif' }}>
