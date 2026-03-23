@@ -1275,7 +1275,34 @@ const Phase3 = ({ d, u }) => {
       {/* Security Cameras */}
       <Divider label="Security Cameras" />
       <Toggle checked={!!d.cameras} onChange={v=>u('cameras',v)} label="New security cameras required" />
-      <div style={{marginTop:10}}>
+      {d.cameras && (
+        <div style={{ marginLeft:54, marginTop:10, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}`, marginBottom:10 }}>
+          <Row>
+            <Field label="Number of Cameras" tight><Num value={d.cameraCount||''} onChange={v=>u('cameraCount',v)} /></Field>
+            <Field label="NVR Storage" tight hint="8TB recommended for 30-day high-res retention">
+              <Select value={d.nvrStorage||''} onChange={v=>u('nvrStorage',v)} placeholder="Select…" options={['4 TB HDD','8 TB HDD (recommended)','12 TB HDD','16 TB HDD']} />
+            </Field>
+          </Row>
+          <Field label="Camera Layout / Location Diagram" hint="Upload a floor plan showing proposed camera positions." tight>
+            <div style={{ marginBottom:8 }}>
+              <label style={{ display:'inline-block', padding:'9px 18px', borderRadius:8, border:`2px dashed ${C.border}`, background:C.surface, color:C.orange, fontWeight:600, fontSize:13, cursor:'pointer' }}>
+                📎 Upload Camera Layout
+                <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{
+                  const f=e.target.files[0]; if(!f) return;
+                  const r=new FileReader(); r.onload=ev=>u('cameraLayoutImage',ev.target.result); r.readAsDataURL(f);
+                }} />
+              </label>
+              {d.cameraLayoutImage && <button onClick={()=>u('cameraLayoutImage',null)} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
+            </div>
+            {d.cameraLayoutImage && (
+              <div style={{ borderRadius:10, overflow:'hidden', border:`1.5px solid ${C.border}`, maxHeight:400 }}>
+                <img src={d.cameraLayoutImage} alt="Camera layout" style={{ width:'100%', display:'block', objectFit:'contain' }} />
+              </div>
+            )}
+          </Field>
+        </div>
+      )}
+      <div style={{marginTop:4}}>
         <Toggle checked={!!d.existingCameras} onChange={v=>u('existingCameras',v)} label="Existing camera system in place" sub={d.existingCameras?'Capture details below':'No existing cameras'} />
         {d.existingCameras && (
           <div style={{ marginLeft:54, marginTop:10, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
@@ -1287,35 +1314,6 @@ const Phase3 = ({ d, u }) => {
           </div>
         )}
       </div>
-      {d.cameras&&(
-        <div style={{ marginTop:12 }}>
-          <Row>
-            <Field label="Number of Cameras"><Num value={d.cameraCount||''} onChange={v=>u('cameraCount',v)} /></Field>
-            <Field label="NVR Storage" hint="8TB recommended for 30-day high-res retention">
-              <Select value={d.nvrStorage||''} onChange={v=>u('nvrStorage',v)} placeholder="Select…" options={['4 TB HDD','8 TB HDD (recommended)','12 TB HDD','16 TB HDD']} />
-            </Field>
-          </Row>
-          <div style={{ marginTop:12 }}>
-            <Field label="Camera Layout / Location Diagram" hint="Upload a floor plan showing proposed camera positions.">
-              <div style={{ marginBottom:8 }}>
-                <label style={{ display:'inline-block', padding:'9px 18px', borderRadius:8, border:`2px dashed ${C.border}`, background:C.surfaceHi, color:C.orange, fontWeight:600, fontSize:13, cursor:'pointer' }}>
-                  📎 Upload Camera Layout
-                  <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{
-                    const f=e.target.files[0]; if(!f) return;
-                    const r=new FileReader(); r.onload=ev=>u('cameraLayoutImage',ev.target.result); r.readAsDataURL(f);
-                  }} />
-                </label>
-                {d.cameraLayoutImage && <button onClick={()=>u('cameraLayoutImage',null)} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
-              </div>
-              {d.cameraLayoutImage && (
-                <div style={{ borderRadius:10, overflow:'hidden', border:`1.5px solid ${C.border}`, maxHeight:400 }}>
-                  <img src={d.cameraLayoutImage} alt="Camera layout" style={{ width:'100%', display:'block', objectFit:'contain' }} />
-                </div>
-              )}
-            </Field>
-          </div>
-        </div>
-      )}
 
       {/* Firewall */}
       <Divider label="Firewall & 4G Failover" />
