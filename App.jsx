@@ -2541,11 +2541,10 @@ const PasswordGate = ({ onAuth }) => {
           <input
             ref={inputRef}
             type="password"
-            value={val}
+            defaultValue=""
             disabled={locked}
             placeholder="Enter password…"
-            onChange={e=>{ setVal(e.target.value); setError(''); }}
-            onKeyDown={e=>e.key==='Enter'&&submit()}
+            onKeyDown={e=>{ setError(''); if(e.key==='Enter') submit(); }}
             style={{ width:'100%', padding:'12px 14px', fontSize:15, border:`1.5px solid ${error?C.red:C.border}`, borderRadius:9, background:C.surfaceHi, color:C.textPrimary, fontFamily:'inherit', marginBottom:14, outline:'none', transition:'border-color .15s' }}
             autoFocus
           />
