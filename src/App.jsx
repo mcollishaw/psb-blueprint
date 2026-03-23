@@ -2499,7 +2499,9 @@ const PasswordGate = ({ onAuth }) => {
 
   const submit = () => {
     if(locked) return;
-    if(val === APP_PASSWORD) {
+    const entered = val.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
+    const expected = APP_PASSWORD.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
+    if(entered === expected) {
       sessionStorage.setItem(AUTH_KEY, '1');
       onAuth();
     } else {
