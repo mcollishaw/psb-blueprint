@@ -2609,7 +2609,7 @@ ${uploads.join('\n')}`;
             </div>
             <input type="url" value={url||''} onChange={e=>u(uk,e.target.value)}
               placeholder="Paste KQM quote URL here…"
-              style={{width:'100%',padding:'6px 10px',borderRadius:7,background:'rgba(0,0,0,.25)',border:`1px solid ${C.border}`,color:C.textPrimary,fontSize:12,outline:'none',boxSizing:'border-box',marginTop:8}} />
+              style={{width:'100%',padding:'6px 10px',borderRadius:7,background:'rgba(0,0,0,.25)',border:`1px solid ${C.border}`,color:C.textPrimary,fontSize:12,outline:'none',boxSizing:'border-box',marginTop:8,display:(locked&&url)?'none':'block'}} />
           </div>
         ))}
       </div>
