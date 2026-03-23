@@ -278,10 +278,285 @@ const HwRow = ({ label, model, qty, onQty, notes, onNotes, showNotes, devices, o
           <span style={{ fontSize:11, color:C.textMuted, whiteSpace:'nowrap' }}>Existing:</span>
           <div style={{ width:70 }}><Num value={existingQty||''} onChange={onExistingQty} /></div>
         </div>
+        {showNotes && count>0 && (
+          <div style={{ flex:1 }}>
+            <Input value={notes||''} onChange={onNotes} placeholder="Describe model / notes…" />
+          </div>
+        )}
       </div>
-      {showNotes && count>0 && (
-        <div style={{marginLeft:10,padding:'6px 0'}}>
-          <Input value={notes||''} onChange={onNotes} placeholder="Brand / Model (e.g. Cisco 8841, Polycom VVX)" />
+      {showDeviceFields && exCount>0 && Array.from({length:exCount}).map((_,i)=>{
+        const dev = (existingDevices||[])[i]||{};
+        return (
+          <div key={`ex-${i}`} style={{marginLeft:10,padding:'8px 12px',background:'rgba(100,116,139,.1)',borderRadius:8,marginBottom:6,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>Existing {label} {exCount>1?i+1:''}</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+              <Input value={dev.location||''} onChange={v=>{const arr=[...(existingDevices||[])];arr[i]={...arr[i],location:v};onExistingDevices(arr);}} placeholder="Location / room" />
+              <Input value={dev.extension||''} onChange={v=>{const arr=[...(existingDevices||[])];arr[i]={...arr[i],extension:v};onExistingDevices(arr);}} placeholder="Extension number" />
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <Input value={dev.username||''} onChange={v=>{const arr=[...(existingDevices||[])];arr[i]={...arr[i],username:v};onExistingDevices(arr);}} placeholder="Username / display name" />
+              <Input value={dev.mac||''} onChange={v=>{const arr=[...(existingDevices||[])];arr[i]={...arr[i],mac:v};onExistingDevices(arr);}} placeholder="MAC address (required)" style={{borderColor: !dev.mac ? C.amber : C.border}} />
+            </div>
+          </div>
+        );
+      })}
+      {showDeviceFields && count>0 && Array.from({length:count}).map((_,i)=>{
+        const dev = (devices||[])[i]||{};
+        return (
+          <div key={i} style={{marginLeft:10,padding:'8px 12px',background:C.surfaceHi,borderRadius:8,marginBottom:6,border:`1px solid ${C.border}`}}>
+            <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:8}}>{label} {count>1?i+1:''} — New</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:6}}>
+              <Input value={dev.location||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],location:v};onDevices(arr);}} placeholder="Location / room" />
+              <Input value={dev.extension||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],extension:v};onDevices(arr);}} placeholder="Extension number" />
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+              <Input value={dev.username||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],username:v};onDevices(arr);}} placeholder="Username / display name" />
+              <Input value={dev.mac||''} onChange={v=>{const arr=[...(devices||[])];arr[i]={...arr[i],mac:v};onDevices(arr);}} placeholder="MAC address (optional)" />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// ── Phase 0: Solution Setup ───────────────────────────────────────────────────
+const QUOTE_DEFS = [
+  { reqKey:'q1req', urlKey:'q1url', num:'1', label:'Hardware & Infrastructure', hint:'Computers, networking, cameras, M365 and installation', color:'#0F172A' },
+  { reqKey:'q2req', urlKey:'q2url', num:'2', label:'Telecommunications',        hint:'NBN, VoIP phone system, handsets and headsets',         color:'#1E3869' },
+  { reqKey:'q3req', urlKey:'q3url', num:'3', label:'Managed Services',          hint:'TotalCare MSA, Advanced Cyber and backup',              color:'#F97316' },
+];
+
+const Phase0 = ({ d, u }) => (
+  <div>
+    <PhaseHeader num={0} title="Solution Setup" sub="Select which quotes are required for this engagement, then link them once created in Kaseya." />
+
+    <Divider label="Which solutions does this practice need?" />
+    <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:24 }}>
+      {QUOTE_DEFS.map(({ reqKey, num, label, hint }) => {
+        const on = d[reqKey] !== false; // default true
+        return (
+          <div key={reqKey} onClick={()=>u(reqKey, !on)}
+            style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 18px', borderRadius:11, border:`2px solid ${on?C.orange:C.border}`, background:on?C.orangeLight:C.surface, cursor:'pointer', userSelect:'none', transition:'all .15s' }}>
+            <div style={{ width:32, height:32, borderRadius:8, background:on?C.orange:'rgba(255,255,255,.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'background .15s' }}>
+              <span style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:13, color:C.white }}>S{num}</span>
+            </div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:14, fontWeight:700, color:C.textPrimary }}>Solution {num} — {label}</div>
+              <div style={{ fontSize:12, color:C.textSecondary, marginTop:2 }}>{hint}</div>
+            </div>
+            <div style={{ width:22, height:22, borderRadius:'50%', border:`2px solid ${on?C.orange:C.border}`, background:on?C.orange:'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, transition:'all .15s' }}>
+              {on && <span style={{ color:C.white, fontSize:12, fontWeight:700 }}>✓</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    <Divider label="KQM Quote URLs" />
+    <InfoBox type="info">
+      Open Kaseya Quote Manager in a separate tab, create a quote for each required section, then paste the URLs below. You can update these at any time.
+    </InfoBox>
+
+    {QUOTE_DEFS.filter(({ reqKey }) => d[reqKey] !== false).map(({ reqKey, urlKey, num, label, hint }) => (
+      <Card key={urlKey} style={{ marginBottom:14 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:10 }}>
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:3 }}>
+              <div style={{ width:24, height:24, borderRadius:6, background:C.orange, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                <span style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:11, color:C.white }}>S{num}</span>
+              </div>
+              <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary }}>Solution {num} — {label}</div>
+            </div>
+            <div style={{ fontSize:12, color:C.textMuted, marginLeft:32 }}>{hint}</div>
+          </div>
+          {d[urlKey] && (
+            <a href={d[urlKey]} target="_blank" rel="noreferrer"
+              style={{ fontSize:12, fontWeight:700, color:C.orange, textDecoration:'none', background:C.orangeLight, padding:'5px 14px', borderRadius:7, whiteSpace:'nowrap', marginLeft:12 }}>
+              Open in KQM ↗
+            </a>
+          )}
+        </div>
+        <Input value={d[urlKey]||''} onChange={v=>u(urlKey,v)} placeholder="https://shop.32byte.com.au/quote/…" />
+        {d[urlKey] && (
+          <div style={{ marginTop:6, display:'flex', alignItems:'center', gap:6 }}>
+            <div style={{ width:7, height:7, borderRadius:'50%', background:C.green, flexShrink:0 }}/>
+            <span style={{ fontSize:12, color:C.green, fontWeight:600 }}>Quote linked</span>
+          </div>
+        )}
+      </Card>
+    ))}
+
+    {QUOTE_DEFS.every(({ reqKey }) => d[reqKey] === false) && (
+      <InfoBox type="warn">No quotes selected — select at least one quote type to continue.</InfoBox>
+    )}
+
+    <div style={{ background:C.surface, border:`1.5px solid ${C.border}`, borderRadius:11, padding:'14px 18px', marginTop:8 }}>
+      <div style={{ fontSize:13, fontWeight:600, color:C.textPrimary, marginBottom:4 }}>Not ready yet?</div>
+      <div style={{ fontSize:13, color:C.textSecondary, lineHeight:1.5 }}>Skip ahead and come back. URLs can be pasted at any point and will appear as links throughout the Blueprint.</div>
+    </div>
+
+    <Divider label="Meeting Details" />
+    <Row>
+      <Field label="32 Byte Sales Rep"><Input value={d.salesRep||''} onChange={v=>u('salesRep',v)} placeholder="Your name" /></Field>
+      <Field label="Meeting Date"><DatePicker value={d.meetingDate||''} onChange={v=>u('meetingDate',v)} /></Field>
+    </Row>
+    <Row>
+      <Field label="Client Contact Name"><Input value={d.contactName||''} onChange={v=>u('contactName',v)} placeholder="Name and role" /></Field>
+      <Field label="Client Email" hint="Used for the follow-up email"><Input type="email" value={d.contactEmail||''} onChange={v=>u('contactEmail',v)} placeholder="email@practice.com.au" /></Field>
+    </Row>
+    <Field label="Internal Team Email" hint="For internal summary email after locking">
+      <Input type="email" value={d.internalTeamEmail||''} onChange={v=>u('internalTeamEmail',v)} placeholder="team@32byte.com.au" />
+    </Field>
+  </div>
+);
+
+// ── Phase 1 ───────────────────────────────────────────────────────────────────
+const Phase1 = ({ d, u }) => {
+  const toggleImg = (sw) => {
+    const cur = d.imagingSw||[];
+    u('imagingSw', cur.includes(sw) ? cur.filter(x=>x!==sw) : [...cur, sw]);
+  };
+  return (
+    <div>
+      <PhaseHeader num={1} title="Practice Discovery" sub="The foundation of the Blueprint — every decision flows from this." />
+      <Row>
+        <Field label="Practice Name" required><Input value={d.practiceName||''} onChange={v=>u('practiceName',v)} placeholder="Practice name" /></Field>
+        <Field label="Principal Dentist / Owner"><Input value={d.principalDentist||''} onChange={v=>u('principalDentist',v)} placeholder="Dr. Name" /></Field>
+      </Row>
+      <Row cols={3}>
+        <Field label="Suburb"><Input value={d.suburb||''} onChange={v=>u('suburb',v)} placeholder="Suburb" /></Field>
+        <Field label="State"><Select value={d.state||''} onChange={v=>u('state',v)} options={AU_STATES} placeholder="Select…" /></Field>
+        <Field label="Postcode"><Input value={d.postcode||''} onChange={v=>u('postcode',v)} placeholder="0000" /></Field>
+      </Row>
+      <Field label="Street Address"><Input value={d.address||''} onChange={v=>u('address',v)} placeholder="Suite / Level, Street, Suburb" /></Field>
+      <Row cols={4}>
+        <Field label="Dental Chairs"><Num value={d.chairs||''} onChange={v=>u('chairs',v)} /></Field>
+        <Field label="Dentists"><Num value={d.dentists||''} onChange={v=>u('dentists',v)} /></Field>
+        <Field label="Admin Staff"><Num value={d.adminStaff||''} onChange={v=>u('adminStaff',v)} /></Field>
+        <Field label="Other Staff"><Num value={d.otherStaff||''} onChange={v=>u('otherStaff',v)} /></Field>
+      </Row>
+      <Divider label="Practice Software" />
+      <Field label="Practice Management Software" required>
+        <Select value={d.pms||''} onChange={v=>u('pms',v)} options={PMS_LIST} placeholder="Select PMS…" />
+      </Field>
+      {d.pms==='Other' && <Field label="PMS Name" tight><Input value={d.pmsOther||''} onChange={v=>u('pmsOther',v)} placeholder="Enter PMS name" /></Field>}
+      <Field label="Imaging / X-ray Software" hint="Select all that apply">
+        <MultiCheck options={IMAGING_SW} selected={d.imagingSw||[]}
+          onChange={toggleImg} otherValues={d.imagingSwOthers||[]} onOtherChange={v=>u('imagingSwOthers',v)} />
+      </Field>
+      <Field label="Practice Type">
+        <div style={{ display:'flex', gap:8 }}>
+          {[{v:'new',l:'New build (greenfield)'},{v:'existing',l:'Existing / fit-out'}].map(o=>{
+            const a=d.practiceType===o.v;
+            return <button key={o.v} onClick={()=>u('practiceType',o.v)} style={{ flex:1, padding:'10px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o.l}</button>;
+          })}
+        </div>
+      </Field>
+      <Divider label="Key Dates" />
+      {d.practiceType==='new' ? (
+        <Row>
+          <Field label="Target Opening Date" required hint="Go-live target — everything is scoped to this.">
+            <DatePicker value={d.openingDate||''} onChange={v=>u('openingDate',v)} />
+          </Field>
+          <Field label="Fitout Completion (estimated)">
+            <DatePicker value={d.fitoutDate||''} onChange={v=>u('fitoutDate',v)} />
+          </Field>
+        </Row>
+      ) : (
+        <Field label="Go-Live Date" required hint="The date 32 Byte takes over support and management.">
+          <DatePicker value={d.goLiveDate||''} onChange={v=>u('goLiveDate',v)} />
+        </Field>
+      )}
+      {d.practiceType==='existing' && (
+        <>
+          <Divider label="Existing IT Provider" />
+          <Toggle checked={!!d.existingIT} onChange={v=>u('existingIT',v)} label="Practice has an existing IT provider" />
+          {d.existingIT && (
+            <div style={{ marginTop:16 }}>
+              <Row>
+                <Field label="Company Name" tight><Input value={d.existingITCompany||''} onChange={v=>u('existingITCompany',v)} placeholder="IT company name" /></Field>
+                <Field label="Contract Type" tight>
+                  <Select value={d.existingITType||''} onChange={v=>u('existingITType',v)}
+                    options={['Managed Service Agreement (MSA)','Break Fix','Ad Hoc','Retainer','Other']} placeholder="Select type…" />
+                </Field>
+              </Row>
+              <Row cols={3}>
+                <Field label="Contact Name" tight><Input value={d.existingITContact||''} onChange={v=>u('existingITContact',v)} placeholder="Name" /></Field>
+                <Field label="Phone" tight><Input value={d.existingITPhone||''} onChange={v=>u('existingITPhone',v)} placeholder="Phone number" /></Field>
+                <Field label="Email" tight><Input type="email" value={d.existingITEmail||''} onChange={v=>u('existingITEmail',v)} placeholder="email@company.com" /></Field>
+              </Row>
+              <Field label="Contract Expiry" tight>
+                <DatePicker value={d.existingITExpiry||''} onChange={v=>u('existingITExpiry',v)} />
+              </Field>
+              <Field label="What does the current provider manage?" hint="All items default to yes — toggle off if they don't manage that item. Use the takeover toggle to flag services 32 Byte will take over.">
+                <div style={{ display:'flex', flexDirection:'column', gap:12, marginTop:4 }}>
+                  {[
+                    {k:'existingITManagesDevices',  pk:'existingITDevices',  tk:'takeoverDevices',  l:'Devices (computers, servers)', hint:'Current RMM, AV, endpoint management'},
+                    {k:'existingITManagesEmail',     pk:'existingITEmail',    tk:'takeoverEmail',    l:'Email (Microsoft 365 / Google)', hint:'Tenant name, current licences, migration needed?'},
+                    {k:'existingITManagesPhones',    pk:'existingITPhones',   tk:'takeoverPhones',   l:'Phone system', hint:'Current provider, DDI numbers, contract expiry'},
+                    {k:'existingITManagesInternet',  pk:'existingITInternet', tk:'takeoverInternet', l:'Internet / NBN', hint:'ISP, speed tier, contract expiry, IP addresses'},
+                    {k:'existingITManagesSecurity',  pk:'existingITSecurity', tk:'takeoverSecurity', l:'Security (AV, patching, monitoring)', hint:'Current AV/EDR vendor, licence count'},
+                  ].map(({k,pk,tk,l,hint})=>(
+                    <div key={k}>
+                      <Toggle checked={d[k]!==false} onChange={v=>u(k,v)} label={l} sub={d[k]!==false?'Managed by existing IT provider':'Not managed by existing IT — capture responsible party below'} />
+                      {d[k]===false && (
+                        <div style={{ marginLeft:54, marginTop:10, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
+                          <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>Who manages {l.toLowerCase()}?</div>
+                          <Row>
+                            <Field label="Company" tight><Input value={(d[pk]||{}).company||''} onChange={v=>u(pk,{...(d[pk]||{}),company:v})} placeholder="Provider / company name" /></Field>
+                            <Field label="Contact" tight><Input value={(d[pk]||{}).contact||''} onChange={v=>u(pk,{...(d[pk]||{}),contact:v})} placeholder="Contact name" /></Field>
+                          </Row>
+                          <Row>
+                            <Field label="Phone" tight><Input value={(d[pk]||{}).phone||''} onChange={v=>u(pk,{...(d[pk]||{}),phone:v})} placeholder="Phone" /></Field>
+                            <Field label="Email" tight><Input type="email" value={(d[pk]||{}).email||''} onChange={v=>u(pk,{...(d[pk]||{}),email:v})} placeholder="email@provider.com" /></Field>
+                          </Row>
+                          {hint&&<div style={{fontSize:11,color:'#64748B',marginTop:6,lineHeight:1.5}}>📋 Capture: {hint}</div>}
+                        </div>
+                      )}
+                      <div style={{marginLeft:54,marginTop:4}}>
+                        <Toggle checked={!!d[tk]} onChange={v=>u(tk,v)}
+                          label="32 Byte to take over this service"
+                          sub={d[tk]?'Will migrate to 32 Byte — include in scope & quote':'Staying with current provider — exclude from scope'} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Notes" tight>
+                <Textarea value={d.existingITNotes||''} onChange={v=>u('existingITNotes',v)} placeholder="Access details, systems in use, known issues, handover requirements…" />
+              </Field>
+            </div>
+          )}
+        </>
+      )}
+      <Divider label="Finance" />
+      <Field label="Practice Finance Provider">
+        <Select value={d.financeProvider||''} onChange={v=>u('financeProvider',v)} options={FINANCE_OPTS} placeholder="Select provider (if applicable)…" />
+      </Field>
+      {d.financeProvider==='Other' && <Field label="Finance Provider Name" tight><Input value={d.financeOther||''} onChange={v=>u('financeOther',v)} placeholder="Enter provider name" /></Field>}
+    </div>
+  );
+};
+
+// ── Phase 2 ───────────────────────────────────────────────────────────────────
+const Phase2 = ({ d, u }) => {
+  const vendors = d.vendors||[];
+  const addV  = () => u('vendors',[...vendors,{ id:uid(), type:'', company:'', contact:'', phone:'', email:'', installResp:'TBD', notes:'' }]);
+  const updV  = (id,k,v) => u('vendors', vendors.map(x=>x.id===id?{...x,[k]:v}:x));
+  const delV  = id => u('vendors', vendors.filter(x=>x.id!==id));
+  const imgV  = vendors.filter(v=>['Imaging Software Vendor','X-ray / OPG / CBCT Supplier','Intraoral Scanner Supplier','PMS Vendor'].includes(v.type));
+  const vendorsInScope = d.q1req !== false || d.practiceType === 'new';
+  return (
+    <div>
+      <PhaseHeader num={2} title="External Vendors" sub="Everyone else on this project. Get contacts early and lock down install responsibilities." />
+      {!vendorsInScope && (
+        <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 16px', background:'rgba(120,80,0,.4)', border:`1.5px solid #F59E0B`, borderRadius:10, marginBottom:20 }}>
+          <span style={{ fontSize:16 }}>⚠️</span>
+          <div style={{ flex:1 }}>
+            <span style={{ fontSize:13, fontWeight:700, color:'#FDE68A' }}>Not applicable for this engagement</span>
+            <span style={{ fontSize:13, color:'#FDE68A' }}> — External vendors are required when Solution 1 (Hardware) is selected or the practice is a new build.</span>
+          </div>
         </div>
       )}
       <InfoBox type="warn"><strong>Key rule:</strong> 32 Byte installs all imaging software (Vistasoft, Sidexis, Romexis etc) — not the equipment vendor. Confirm and resolve any conflicts now.</InfoBox>
@@ -2529,8 +2804,8 @@ const PasswordGate = ({ onAuth }) => {
       <div style={{ width:'100%', maxWidth:400, padding:'0 24px' }}>
         {/* Logo */}
         <div style={{ textAlign:'center', marginBottom:40 }}>
-          <div style={{ width:60, height:60, borderRadius:14, background:C.orange, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', boxShadow:'0 8px 24px rgba(249,115,22,.35)' }}>
-            <span style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:22, color:C.white }}>32</span>
+          <div style={{ width:70, height:70, margin:'0 auto 16px', display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <img src="data:image/png;base64,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" width="70" height="87" alt="32 Byte" style={{objectFit:'contain'}} />
           </div>
           <div style={{ fontFamily:'Sora,sans-serif', fontWeight:800, fontSize:22, color:C.textPrimary, marginBottom:4 }}>32 Byte</div>
           <div style={{ fontSize:13, color:C.textMuted, letterSpacing:'.08em', textTransform:'uppercase', fontWeight:600 }}>Practice Success Blueprint</div>
