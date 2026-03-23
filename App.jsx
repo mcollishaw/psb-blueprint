@@ -2496,10 +2496,11 @@ const PasswordGate = ({ onAuth }) => {
   const [error,    setError]    = useState('');
   const [attempts, setAttempts] = useState(0);
   const [locked,   setLocked]   = useState(false);
+  const valRef = React.useRef('');
 
   const submit = () => {
     if(locked) return;
-    const entered = val.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
+    const entered = valRef.current.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
     const expected = APP_PASSWORD.trim().replace(/[\u2018\u2019\u201C\u201D]/g, '');
     if(entered === expected) {
       sessionStorage.setItem(AUTH_KEY, '1');
@@ -2508,6 +2509,7 @@ const PasswordGate = ({ onAuth }) => {
       const next = attempts + 1;
       setAttempts(next);
       setVal('');
+      valRef.current = '';
       if(next >= 5) {
         setLocked(true);
         setError('Too many incorrect attempts. Close and reopen the tab to try again.');
@@ -2539,10 +2541,12 @@ const PasswordGate = ({ onAuth }) => {
             tabIndex={0}
             onKeyDown={e=>{
               if(locked) return;
+              e.preventDefault();
+              e.stopPropagation();
               setError('');
               if(e.key==='Enter'){ submit(); return; }
-              if(e.key==='Backspace'){ setVal(v=>v.slice(0,-1)); return; }
-              if(e.key.length===1){ setVal(v=>v+e.key); }
+              if(e.key==='Backspace'){ setVal(v=>{ const n=v.slice(0,-1); valRef.current=n; return n; }); return; }
+              if(e.key.length===1){ setVal(v=>{ const n=v+e.key; valRef.current=n; return n; }); }
             }}
             style={{ width:'100%', padding:'12px 14px', fontSize:15, border:`1.5px solid ${error?C.red:C.border}`, borderRadius:9, background:C.surfaceHi, color:C.textPrimary, fontFamily:'inherit', marginBottom:14, outline:'none', cursor:'text', minHeight:46, letterSpacing:'0.2em', userSelect:'none' }}
             autoFocus
