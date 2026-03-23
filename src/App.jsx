@@ -1710,14 +1710,7 @@ const Phase5 = ({ d, u, rooms }) => {
             </div>
           );
         })()}
-        {/* Keep datto/cloudBackup flags for summary compatibility */}
-        {(()=>{
-          const hasBCDR = (d.backupDevices||[]).some(bd=>bd.backupType&&bd.backupType.includes('BCDR'));
-          const hasCloud = (d.backupDevices||[]).some(bd=>bd.backupType&&(bd.backupType.includes('Cloud')||bd.backupType.includes('Both')));
-          if(hasBCDR!==!!d.datto) u('datto',hasBCDR);
-          if(hasCloud!==!!d.cloudBackup) u('cloudBackup',hasCloud);
-          return null;
-        })()}
+        {/* datto/cloudBackup flags kept in sync via summary page reads */}
       </div>
       <Divider label="Cyber Liability Insurance" />
       <InfoBox>Capture the practice's existing cyber insurance details — important context for our Advanced Cyber Security recommendations.</InfoBox>
