@@ -2540,12 +2540,14 @@ const PasswordGate = ({ onAuth }) => {
           <label style={{ display:'block', fontWeight:600, fontSize:11, color:C.textSecondary, marginBottom:6, letterSpacing:'.06em', textTransform:'uppercase' }}>Password</label>
           <input
             ref={inputRef}
-            type="password"
+            type="text"
             defaultValue=""
             disabled={locked}
             placeholder="Enter password…"
+            autoComplete="off"
+            data-lpignore="true"
             onKeyDown={e=>{ setError(''); if(e.key==='Enter') submit(); }}
-            style={{ width:'100%', padding:'12px 14px', fontSize:15, border:`1.5px solid ${error?C.red:C.border}`, borderRadius:9, background:C.surfaceHi, color:C.textPrimary, fontFamily:'inherit', marginBottom:14, outline:'none', transition:'border-color .15s' }}
+            style={{ width:'100%', padding:'12px 14px', fontSize:15, border:`1.5px solid ${error?C.red:C.border}`, borderRadius:9, background:C.surfaceHi, color:'transparent', caretColor:C.textPrimary, fontFamily:'inherit', marginBottom:14, outline:'none', transition:'border-color .15s', textShadow:`0 0 8px ${C.textPrimary}`, letterSpacing:'0.15em' }}
             autoFocus
           />
 
