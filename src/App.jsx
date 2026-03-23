@@ -636,7 +636,7 @@ const Phase3 = ({ d, u }) => {
   const newDevices = rooms.filter(r=>!r.existingPC || r.replacePC).reduce((a,r)=>a+n(r.qty),0);
   const networkingHrs = (d.switchType||d.wifiAPs||d.firewall||d.failover) ? 2 : 0;
   const cameraHrs = d.cameras ? (n(d.cameraCount)*0.25) : 0;
-  const totalHandsets = (d.handsets||[]).reduce((a,h)=>a+n(h.qty),0) + (d.cordless||[]).reduce((a,h)=>a+n(h.qty),0);
+  const totalHandsets = (d.phoneDevices||[]).length;
   const phoneHrs = totalHandsets > 0 ? 2 + Math.max(0, totalHandsets-4) * 0.25 : 0;
   const psHrs  = (newDevices * 2.5) + networkingHrs + cameraHrs;
   const notReq = d.q1req === false;
@@ -1438,20 +1438,7 @@ const Phase3 = ({ d, u }) => {
 // ── Phase 4 ───────────────────────────────────────────────────────────────────
 const Phase4 = ({ d, u }) => {
   const notReq = d.q2req === false;
-  const hasPhones = (d.handsets||[]).some(h=>n(h.qty)>0) || (d.headsets||[]).some(h=>n(h.qty)>0) || (d.cordless||[]).some(h=>n(h.qty)>0);
-  // Init handset arrays if needed
-  const initHandsets = () => {
-    if(!d.handsets) u('handsets', HANDSET_MODELS.map(m=>({ model:m, qty:'', notes:'' })));
-    if(!d.headsets) u('headsets', HEADSET_MODELS.map(m=>({ model:m, qty:'', notes:'' })));
-    if(!d.cordless) u('cordless', CORDLESS_MODELS.map(m=>({ model:m, qty:'', notes:'' })));
-  };
-  if(!d.handsets) { initHandsets(); return null; }
-
-  const updHw = (key, idx, field, val) => {
-    const arr = [...(d[key]||[])];
-    arr[idx] = { ...arr[idx], [field]:val };
-    u(key, arr);
-  };
+  const hasPhones = (d.phoneDevices||[]).length > 0;
 
   return (
     <div>
@@ -1664,53 +1651,78 @@ const Phase4 = ({ d, u }) => {
         </div>
       )}
 
-      <Divider label="Desk Handsets" />
-      <InfoBox>Select quantities for each model required. Leave blank if not needed.</InfoBox>
-      <div style={{ border:`1px solid ${C.border}`, borderRadius:9, overflow:'hidden', marginBottom:14 }}>
-        <div style={{ padding:'8px 14px', background:C.surface, fontSize:11, fontWeight:700, color:C.textSecondary, letterSpacing:'.06em', textTransform:'uppercase', display:'grid', gridTemplateColumns:'1fr 80px', gap:10 }}>
-          <span>Model</span><span style={{ textAlign:'center' }}>Qty</span>
-        </div>
-        {(d.handsets||[]).map((h,i)=>(
-          <div key={h.model}>
-            <HwRow label={h.model} qty={h.qty} onQty={v=>updHw('handsets',i,'qty',v)}
-              notes={h.notes} onNotes={v=>updHw('handsets',i,'notes',v)} showNotes={h.model==='Other'}
-              showDeviceFields={h.model!=='Other'} devices={h.devices||[]} onDevices={v=>updHw('handsets',i,'devices',v)} existingQty={h.existingQty||''} onExistingQty={v=>updHw('handsets',i,'existingQty',v)} existingDevices={h.existingDevices||[]} onExistingDevices={v=>updHw('handsets',i,'existingDevices',v)} />
-          </div>
-        ))}
-      </div>
+      <Divider label="Phone Devices" />
+      {(()=>{
+        const devices = d.phoneDevices||[];
+        const upd = (idx, field, val) => {
+          const arr = devices.map((x,i)=>i===idx?{...x,[field]:val}:x);
+          u('phoneDevices', arr);
+        };
+        const remove = idx => u('phoneDevices', devices.filter((_,i)=>i!==idx));
+        const add = () => u('phoneDevices', [...devices, {id:uid(),deviceType:'',model:'',modelOther:'',location:'',extension:'',displayName:'',mac:'',existing:false}]);
 
-      <Divider label="Wireless Headsets" />
-      <div style={{ border:`1px solid ${C.border}`, borderRadius:9, overflow:'hidden', marginBottom:14 }}>
-        <div style={{ padding:'8px 14px', background:C.surface, fontSize:11, fontWeight:700, color:C.textSecondary, letterSpacing:'.06em', textTransform:'uppercase', display:'grid', gridTemplateColumns:'1fr 80px', gap:10 }}>
-          <span>Model</span><span style={{ textAlign:'center' }}>Qty</span>
-        </div>
-        {(d.headsets||[]).map((h,i)=>(
-          <div key={h.model}>
-            <HwRow label={h.model} qty={h.qty} onQty={v=>updHw('headsets',i,'qty',v)}
-              notes={h.notes} onNotes={v=>updHw('headsets',i,'notes',v)} showNotes={h.model==='Other'} />
-          </div>
-        ))}
-      </div>
+        const DESK_MODELS   = ['T53W','T54W','T73U','T87W','Other'];
+        const HEADSET_MODELS_LIST = ['WH64 Wireless DECT','Other'];
+        const CORDLESS_MODELS_LIST = ['W76P','Other'];
+        const modelOptions = (type) => type==='Desk' ? DESK_MODELS : type==='Headset' ? HEADSET_MODELS_LIST : type==='Cordless' ? CORDLESS_MODELS_LIST : [];
 
-      <Divider label="Cordless Handsets" />
-      <div style={{ border:`1px solid ${C.border}`, borderRadius:9, overflow:'hidden', marginBottom:14 }}>
-        <div style={{ padding:'8px 14px', background:C.surface, fontSize:11, fontWeight:700, color:C.textSecondary, letterSpacing:'.06em', textTransform:'uppercase', display:'grid', gridTemplateColumns:'1fr 80px', gap:10 }}>
-          <span>Model</span><span style={{ textAlign:'center' }}>Qty</span>
-        </div>
-        {(d.cordless||[]).map((h,i)=>(
-          <div key={h.model}>
-            <HwRow label={h.model} qty={h.qty} onQty={v=>updHw('cordless',i,'qty',v)}
-              notes={h.notes} onNotes={v=>updHw('cordless',i,'notes',v)} showNotes={h.model==='Other'}
-              showDeviceFields={h.model!=='Other'} devices={h.devices||[]} onDevices={v=>updHw('cordless',i,'devices',v)} existingQty={h.existingQty||''} onExistingQty={v=>updHw('cordless',i,'existingQty',v)} existingDevices={h.existingDevices||[]} onExistingDevices={v=>updHw('cordless',i,'existingDevices',v)} />
-          </div>
-        ))}
-      </div>
-
-      {hasPhones&&(
-        <div style={{ background:C.surface, border:`1.5px solid ${C.border}`, borderRadius:9, padding:'12px 16px', fontSize:13, color:C.textSecondary }}>
-          Phone / headset setup: 2 hrs included in professional services
-        </div>
-      )}
+        return (
+          <>
+            {devices.map((dev,i)=>{
+              const opts = modelOptions(dev.deviceType);
+              const isOther = dev.model==='Other';
+              const typeLabel = dev.deviceType||(dev.modelOther||dev.model||'Device');
+              return (
+                <div key={dev.id} style={{marginBottom:10,padding:'14px 16px',background:C.surfaceHi,borderRadius:10,border:`1.5px solid ${C.border}`}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+                    <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:13,color:C.textPrimary}}>
+                      Device {i+1}{dev.deviceType?` — ${dev.deviceType}`:''}{(dev.model&&!isOther)?`: ${dev.model}`:''}
+                    </div>
+                    <button onClick={()=>remove(i)} style={{color:C.red,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:700}}>Remove</button>
+                  </div>
+                  <Row>
+                    <Field label="Device Type" tight>
+                      <Select value={dev.deviceType||''} onChange={v=>upd(i,'deviceType',v)} placeholder="Select type…" options={['Desk','Cordless','Headset']} />
+                    </Field>
+                    <Field label="Device Model" tight>
+                      {dev.deviceType ? (
+                        isOther
+                          ? <Input value={dev.modelOther||''} onChange={v=>upd(i,'modelOther',v)} placeholder="Enter model…" />
+                          : <Select value={dev.model||''} onChange={v=>upd(i,'model',v)} placeholder="Select model…" options={opts} />
+                      ) : <Input value='' onChange={()=>{}} placeholder="Select type first" disabled />}
+                    </Field>
+                  </Row>
+                  <Row>
+                    <Field label="Location" tight>
+                      <Input value={dev.location||''} onChange={v=>upd(i,'location',v)} placeholder="e.g. Reception, Surgery 1" />
+                    </Field>
+                    <Field label="Extension Number" tight>
+                      <Input value={dev.extension||''} onChange={v=>upd(i,'extension',v)} placeholder="e.g. 101" />
+                    </Field>
+                  </Row>
+                  <Row>
+                    <Field label="User / Display Name" tight>
+                      <Input value={dev.displayName||''} onChange={v=>upd(i,'displayName',v)} placeholder="e.g. Reception, Dr Smith" />
+                    </Field>
+                    <Field label="MAC Address" tight>
+                      <Input value={dev.mac||''} onChange={v=>upd(i,'mac',v)} placeholder="e.g. 00:1A:2B:3C:4D:5E" />
+                    </Field>
+                  </Row>
+                  <Toggle checked={!!dev.existing} onChange={v=>upd(i,'existing',v)} label="Existing device (already on-site)" />
+                </div>
+              );
+            })}
+            <button onClick={add} style={{width:'100%',padding:'10px',borderRadius:9,border:`2px dashed ${C.border}`,background:'transparent',color:C.orange,fontWeight:700,fontSize:13,cursor:'pointer',marginBottom:12}}>
+              + Add Phone Device
+            </button>
+            {devices.length>0&&(
+              <div style={{background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:9,padding:'12px 16px',fontSize:13,color:C.textSecondary}}>
+                Phone / headset setup: 2 hrs base + 15 min per handset beyond 4 — included in professional services
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       <Divider label="Notes" />
       <Textarea value={d.telecomNotes||''} onChange={v=>u('telecomNotes',v)} placeholder="Existing provider, contract expiry, number porting details, building NBN status…" />
@@ -1974,8 +1986,7 @@ const EmailModal = ({ d, rooms, onClose }) => {
       d.nbn && `Business NBN ${d.nbnTier||''}`,
       d.sim4g && '4G backup SIM',
       d.voip && `VoIP phone service (${d.voipLicences||'?'} licences)`,
-      ...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`${n(h.qty)}× ${h.model} handset${n(h.qty)!==1?'s':''}`),
-      ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`${n(h.qty)}× ${h.model} headset${n(h.qty)!==1?'s':''}`),
+      ...(d.phoneDevices||[]).map(dev=>`${dev.deviceType||'Device'}: ${dev.model==='Other'?dev.modelOther||'Other':dev.model}${dev.location?' ('+dev.location+')':''}`),
     ].filter(Boolean).join(', ');
     const msaList = [
       endpoints>0 && `TotalCare MSA (${endpoints} device${endpoints!==1?'s':''})`,
@@ -2103,9 +2114,7 @@ Return only the email text, no subject line, no preamble.`;
         d.internetType&&d.internetType!=='nbn'&&row('Internet',`${d.internetType==='fibre'?'Private Fibre':d.internetType==='leased'?'Leased Line':d.internetType} ${d.fibreSpeed||d.customSpeed||''}${d.fibreProvider?' &#183; '+d.fibreProvider:''}`),
         d.sim4g&&row('4G Backup SIM','Included'),
         d.voip&&row('VoIP Phone Service',`${d.voipLicences||'?'} licences${d.porting?' &#183; Number porting':''}`),
-        ...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>row(h.model+' Handset','&#215; '+h.qty)),
-        ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>row(h.model+' Headset','&#215; '+h.qty)),
-        ...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>row('Other Cordless','&#215; '+h.qty)),
+        ...(d.phoneDevices||[]).map(dev=>row(`${dev.deviceType||'Device'} — ${dev.model==='Other'?dev.modelOther||'Other':dev.model}${dev.location?' ('+dev.location+')':''}`,dev.displayName||dev.extension||'Assigned')),
       ].filter(Boolean);
       const telHTML = telRows.length?wrapRows(telRows):'<p style="padding:8px 16px;font-size:13px;color:#94A3B8;margin:0">Not included.</p>';
 
@@ -2288,7 +2297,7 @@ const Phase6 = ({ d, u, locked, onLock, rooms, goStep }) => {
   const autoEP = (rooms||[]).reduce((a,r)=>a+n(r.qty),0);
   const endpoints = n(d.endpoints)||autoEP;
   const psHrs = n(d.installHours)||(rooms.reduce((a,r)=>a+n(r.qty),0)*2.5);
-  const hasPhones = (d.handsets||[]).some(h=>n(h.qty)>0)||(d.headsets||[]).some(h=>n(h.qty)>0)||(d.cordless||[]).some(h=>n(h.qty)>0);
+  const hasPhones = (d.phoneDevices||[]).length>0;
   const telPS = hasPhones ? 2 : 0;
   const fmtDate = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-AU',{ weekday:'long', day:'numeric', month:'long', year:'numeric' }) : null;
   const shortDate = s => s ? new Date(s+'T00:00:00').toLocaleDateString('en-AU',{ day:'numeric', month:'short', year:'numeric' }) : null;
@@ -2357,9 +2366,7 @@ TELECOMS
 ${'─'.repeat(40)}
 NBN: ${d.nbn?(d.nbnTier||'TBC'):'Not required'} | 4G SIM: ${d.sim4g?'Yes':'No'}
 VoIP: ${d.voip?`${d.voipLicences||'?'} licences${d.porting?' · porting required':''}`:'Not required'}
-${[...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Handset × ${h.qty}`),
-   ...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Headset × ${h.qty}`),
-   ...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Cordless × ${h.qty}`)].join(' | ')||'No handsets / headsets'}
+${(d.phoneDevices||[]).map(dev=>`${dev.deviceType} ${dev.model==='Other'?dev.modelOther||'Other':dev.model}${dev.location?' @'+dev.location:''}${dev.extension?' ext.'+dev.extension:''}${dev.existing?' [existing]':''}`).join(' | ')||'No devices'}
 
 MANAGED SERVICES
 ${'─'.repeat(40)}
@@ -2444,9 +2451,7 @@ d.m365Premium||d.m365F1?`M365: ${[d.m365Premium&&d.m365Premium+'× Business Prem
 `TELECOMS`,`${'─'.repeat(40)}`,
 `Internet: ${d.internetType==='nbn'?'NBN '+d.nbnTier:d.internetType||'TBC'} | 4G SIM: ${d.sim4g?'Yes':'No'}`,
 d.voip?`VoIP: ${d.voipLicences||'?'} licences${d.porting?' | Porting: '+(d.portingNumbers||'TBC')+' via '+(d.portingCarrier||'TBC'):''}`:null,
-...(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Handset ×${h.qty}`),
-...(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Cordless ×${h.qty}`),
-...(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=>`${h.model} Headset ×${h.qty}`),``,
+...(d.phoneDevices||[]).map(dev=>`${dev.deviceType} ${dev.model==='Other'?dev.modelOther||'Other':dev.model}${dev.location?' | '+dev.location:''}${dev.extension?' | ext.'+dev.extension:''}${dev.displayName?' | '+dev.displayName:''}${dev.mac?' | MAC:'+dev.mac:''}${dev.existing?' [existing]':''}`),``,
 `MANAGED SERVICES`,`${'─'.repeat(40)}`,
 `MSA: ${d.msaSelected!==false?ep+' endpoints':'NOT SELECTED'}`,
 `Cyber: ${d.advancedCyber?'Full Suite':([d.cyberSoc&&'SOC',d.cyberPam&&'PAM',d.cyberDwm&&'DWM',d.cyberPwdMgr&&'Password Mgr'].filter(Boolean).join(' + ')||'None selected')}`,
@@ -2648,9 +2653,7 @@ ${d.risks}`:null,
           <SumRow label="Internet" value={d.nbn?`Business NBN ${d.nbnTier||''}`:null} />
           <SumRow label="4G Backup SIM" value={d.sim4g?'Included':null} />
           <SumRow label="VoIP Phone Service" value={d.voip?`${d.voipLicences||'?'} licences${d.porting?' · Number porting':''}`:null} />
-          {(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=><SumRow key={h.model} label={`${h.model} Handset`} value={`× ${h.qty}`} />)}
-          {(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=><SumRow key={h.model} label={`${h.model} Headset`} value={`× ${h.qty}`} />)}
-          {(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=><SumRow key={h.model} label={`${h.model} Cordless`} value={`× ${h.qty}`} />)}
+          {(d.phoneDevices||[]).map((dev,i)=><SumRow key={i} label={`${dev.deviceType||'Device'} — ${dev.model==='Other'?dev.modelOther||'Other':dev.model}${dev.location?' ('+dev.location+')':''}`} value={`${dev.displayName||dev.extension||''}${dev.existing?' · Existing':''}`} />)}
         </SumSection>
       )}
 
@@ -2754,18 +2757,10 @@ ${d.risks}`:null,
             }
           });
         }
-        // Handset details
-        (d.handsets||[]).forEach(h=>{
-          if(n(h.qty)>0 && h.model!=='Other'){
-            const missing = Array.from({length:n(h.qty)}).filter((_,i)=>!(h.devices||[])[i]?.extension).length;
-            if(missing>0) warnings.push({text:`${h.model} handsets: ${missing} device${missing!==1?'s':''} missing extension details`, step:4});
-          }
-        });
-        (d.cordless||[]).forEach(h=>{
-          if(n(h.qty)>0 && h.model!=='Other'){
-            const missing = Array.from({length:n(h.qty)}).filter((_,i)=>!(h.devices||[])[i]?.extension).length;
-            if(missing>0) warnings.push({text:`${h.model} cordless: ${missing} device${missing!==1?'s':''} missing extension details`, step:4});
-          }
+        // phoneDevices - no mandatory fields to check
+        (d.phoneDevices||[]).forEach((dev,i)=>{
+          if(!dev.deviceType) warnings.push({text:`Phone device ${i+1}: device type not selected`, step:4});
+          if(!dev.model) warnings.push({text:`Phone device ${i+1}: model not selected`, step:4});
         });
         // BCDR sizing
         if(d.datto && !d.dattoDataVolume) warnings.push({text:'BCDR Appliance: data volume not selected — cannot recommend Datto model', step:5});
@@ -2877,9 +2872,7 @@ ${d.risks}`:null,
                   <KRow label="Number Porting" value={d.porting?'Yes — coordinate with provider':null} />
                 </KSection>
                 <KSection title="Hardware">
-                  {(d.handsets||[]).filter(h=>n(h.qty)>0).map(h=><KRow key={h.model} label={`${h.model} Handset`} value={`× ${h.qty}${h.notes?` (${h.notes})`:''}` } />)}
-                  {(d.headsets||[]).filter(h=>n(h.qty)>0).map(h=><KRow key={h.model} label={`${h.model} Headset`} value={`× ${h.qty}${h.notes?` (${h.notes})`:''}` } />)}
-                  {(d.cordless||[]).filter(h=>n(h.qty)>0).map(h=><KRow key={h.model} label={`${h.model} Cordless`} value={`× ${h.qty}${h.notes?` (${h.notes})`:''}` } />)}
+                  {(d.phoneDevices||[]).map((dev,i)=><KRow key={i} label={`${dev.deviceType||'Device'} — ${dev.model==='Other'?dev.modelOther||'Other':dev.model}`} value={`${dev.location||''}${dev.extension?' ext.'+dev.extension:''}${dev.displayName?' · '+dev.displayName:''}${dev.existing?' · Existing':''}`} />)}
                 </KSection>
                 {telPS>0&&<KSection title="Professional Services — Q2"><KRow label="Phone / Headset Setup" value="2 hrs @ $220" /></KSection>}
               </>
