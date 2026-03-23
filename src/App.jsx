@@ -2069,17 +2069,13 @@ d.existingM365&&(d.m365Users||[]).length>0?`M365 Users (${(d.m365Users||[]).leng
 ``,
 `IMAGING EQUIPMENT`,
 `${'─'.repeat(40)}`,
-(d.intraoralScanners||[]).length>0?(d.intraoralScanners||[]).map((s,i)=>`Intraoral ${i+1}: ${s.model||'TBC'} | SW: ${s.software||'—'}${s.installed?' [EXISTING]':''}${s.dedicated?' [dedicated PC]':''}${s.database?' [RAID — DB: '+s.dbDeviceName+']':''}`).join('
-'):'No intraoral scanners',
-(d.xrayMachines||[]).length>0?(d.xrayMachines||[]).map((x,i)=>`X-ray ${i+1}: ${x.model||'TBC'} (${x.type||'TBC'}) | SW: ${x.software||'—'} | ${x.timing||'timing TBC'}${x.installed?' [EXISTING]':''}${x.database?' [RAID — DB: '+x.dbDeviceName+']':''}`).join('
-'):'No X-ray machines',
-(d.otherImaging||[]).map((o,i)=>`Other ${i+1}: ${o.desc||'TBC'}`).join('
-'),
+(d.intraoralScanners||[]).length>0?(d.intraoralScanners||[]).map((s,i)=>`Intraoral ${i+1}: ${s.model||'TBC'} | SW: ${s.software||'—'}${s.installed?' [EXISTING]':''}${s.dedicated?' [dedicated PC]':''}${s.database?' [RAID — DB: '+s.dbDeviceName+']':''}`).join('\n'):'No intraoral scanners',
+(d.xrayMachines||[]).length>0?(d.xrayMachines||[]).map((x,i)=>`X-ray ${i+1}: ${x.model||'TBC'} (${x.type||'TBC'}) | SW: ${x.software||'—'} | ${x.timing||'timing TBC'}${x.installed?' [EXISTING]':''}${x.database?' [RAID — DB: '+x.dbDeviceName+']':''}`).join('\n'):'No X-ray machines',
+(d.otherImaging||[]).map((o,i)=>`Other ${i+1}: ${o.desc||'TBC'}`).join('\n'),
 ``,
 `EXTERNAL VENDORS`,
 `${'─'.repeat(40)}`,
-(d.vendors||[]).length>0?(d.vendors||[]).map(v=>`${v.type||(v.customType||'Vendor')}: ${v.company||'—'} | ${v.contact||'—'} | ${v.phone||'—'} | ${v.email||'—'} | Install: ${v.installResp||'TBD'}`).join('
-'):'None captured',
+(d.vendors||[]).length>0?(d.vendors||[]).map(v=>`${v.type||(v.customType||'Vendor')}: ${v.company||'—'} | ${v.contact||'—'} | ${v.phone||'—'} | ${v.email||'—'} | Install: ${v.installResp||'TBD'}`).join('\n'):'None captured',
 ``,
 `TELECOMS`,
 `${'─'.repeat(40)}`,
@@ -2111,8 +2107,7 @@ d.risks?`
 RISKS & NOTES
 ${'─'.repeat(40)}
 ${d.risks}`:'',
-                      ].filter(v=>v!==false&&v!==null&&v!==undefined&&v!=='').join('
-');
+                      ].filter(v=>v!==false&&v!==null&&v!==undefined&&v!=='').join('\n');
 
                       // Build base64 JSON attachment
                       const exportJson = JSON.stringify({...d, _exportDate: new Date().toISOString()}, null, 2);
