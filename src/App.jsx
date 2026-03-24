@@ -1760,33 +1760,144 @@ const Phase5 = ({ d, u, rooms }) => {
         </Field>
       )}
 
+      {/* MSA value prop */}
+      <div style={{background:'linear-gradient(135deg,#0F172A 0%,#1A2D45 100%)',borderRadius:11,padding:'16px',marginBottom:14,border:`1px solid ${C.border}`}}>
+        <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:12}}>Why TotalCare MSA pays for itself</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:12}}>
+          {[
+            {val:'$36,300',label:'Avg. annual value delivered',sub:'4-chair practice · $2,200/chair/day'},
+            {val:'3.8×',label:'Average ROI',sub:'Net return vs. MSA investment'},
+            {val:'$37',label:'Per chair, per day',sub:'What proactive IT is worth'},
+            {val:'245',label:'Protected working days',sub:'No downtime = no lost revenue'},
+          ].map(({val,label,sub})=>(
+            <div key={label} style={{background:'rgba(255,255,255,.04)',borderRadius:8,padding:'10px 12px',border:`1px solid ${C.border}`}}>
+              <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:C.orange}}>{val}</div>
+              <div style={{fontSize:12,fontWeight:600,color:C.textPrimary,marginTop:2}}>{label}</div>
+              <div style={{fontSize:11,color:C.textMuted,marginTop:1}}>{sub}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+          {['Unlimited remote support','Proactive patching','Vendor management','On-site visits included'].map(f=>(
+            <div key={f} style={{fontSize:11,color:'#10B981',background:'rgba(16,185,129,.1)',borderRadius:6,padding:'5px 10px',border:'1px solid rgba(16,185,129,.2)'}}>✓ {f}</div>
+          ))}
+        </div>
+      </div>
+
       <Divider label="Advanced Cyber Security" />
       <div style={{border:`1.5px solid ${d.advancedCyber?C.orangeBorder:'rgba(239,68,68,.3)'}`,borderRadius:11,padding:'14px 16px',marginBottom:8}}>
         <Toggle checked={!!d.advancedCyber} onChange={v=>u('advancedCyber',v)}
-          label="Advanced Cyber Security Suite (Full Bundle)"
-          sub="Select the bundle or choose individual components below" />
-        {[
-          {k:'cyberSoc',     l:'Managed SOC — 24/7 threat monitoring',    warn:'Practice has no 24/7 security monitoring — high risk for ransomware'},
-          {k:'cyberPam',     l:'PAM — Privileged Access Management',       warn:'Admin accounts unprotected — easy target for credential attacks'},
-          {k:'cyberDwm',     l:'Dark Web Monitoring',                      warn:'No visibility of compromised staff credentials on the dark web'},
-          {k:'cyberPwdMgr',  l:'Password Manager',                         warn:'Staff likely reusing weak passwords — major security risk'},
-        ].map(({k,l,warn})=>{
-          const on = d.advancedCyber || !!d[k];
-          return (
-            <div key={k} style={{marginLeft:54,marginTop:8,padding:'8px 12px',background:C.surfaceHi,borderRadius:8,border:`1px solid ${on?C.border:'rgba(239,68,68,.2)'}`}}>
-              <Toggle checked={on} onChange={v=>{ if(!d.advancedCyber) u(k,v); }}
-                label={l} sub={on?'Selected':'Not selected'} />
-              {!on&&<div style={{fontSize:11,color:'#FCA5A5',marginTop:4,marginLeft:50}}>⚠️ {warn}</div>}
+          label="Advanced Cyber Security Suite"
+          sub="All four components are included as a bundle — not sold separately" />
+        {/* Component list — informational only */}
+        <div style={{marginLeft:54,marginTop:10,display:'flex',flexDirection:'column',gap:6}}>
+          {[
+            {icon:'🔭', l:'Managed SOC', desc:'24/7 threat monitoring & response'},
+            {icon:'🔐', l:'PAM', desc:'Privileged Access Management'},
+            {icon:'🕵️', l:'Dark Web Monitoring', desc:'Compromised credential alerts'},
+            {icon:'🗝️', l:'Password Manager', desc:'Secure credential management for all staff'},
+          ].map(({icon,l,desc})=>(
+            <div key={l} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 12px',background:C.surfaceHi,borderRadius:8,border:`1px solid ${d.advancedCyber?C.border:'rgba(255,255,255,.05)'}`}}>
+              <span style={{fontSize:16}}>{icon}</span>
+              <div>
+                <span style={{fontSize:13,fontWeight:700,color:d.advancedCyber?C.textPrimary:C.textMuted}}>{l}</span>
+                <span style={{fontSize:12,color:C.textMuted,marginLeft:6}}>{desc}</span>
+              </div>
+              {d.advancedCyber && <span style={{marginLeft:'auto',fontSize:11,fontWeight:700,color:'#10B981'}}>✓ Included</span>}
             </div>
-          );
-        })}
-        {!d.advancedCyber && !d.cyberSoc && !d.cyberPam && !d.cyberDwm && !d.cyberPwdMgr && (
+          ))}
+        </div>
+        {!d.advancedCyber && (
           <div style={{marginTop:10,padding:'8px 12px',background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',borderRadius:7,fontSize:12,color:'#FCA5A5'}}>
-            ⚠️ No cyber security components selected — practice is at significant risk. Document any known risks below.
+            ⚠️ Advanced Cyber not selected — practice has no SOC monitoring, PAM, dark web visibility or password management. Document any known risks below.
           </div>
         )}
       </div>
-      <div style={{display:'flex',gap:10,marginTop:8,marginBottom:4}}>
+
+      {/* Advanced Cyber value prop — breach risk */}
+      {(()=>{
+        const allSelected = d.advancedCyber && d.msaSelected!==false && (d.backupDevices||[]).some(b=>b.backupType&&b.backupType.includes('BCDR'));
+        const borderCol = d.advancedCyber ? 'rgba(16,185,129,.5)' : 'rgba(239,68,68,.5)';
+        const headerCol = d.advancedCyber ? '#10B981' : '#EF4444';
+        const bgGrad = d.advancedCyber ? 'linear-gradient(135deg,#0A1A12 0%,#0D2318 100%)' : 'linear-gradient(135deg,#1A0A0A 0%,#2D1515 100%)';
+        return (
+          <div style={{background:bgGrad,borderRadius:11,padding:'16px',marginBottom:8,border:`2px solid ${borderCol}`}}>
+            {/* Header */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
+              <div>
+                <div style={{fontSize:11,fontWeight:700,color:headerCol,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:4}}>
+                  {d.advancedCyber ? '✓ Cyber Risk with Advanced Cyber selected' : '⚠️ Cyber Risk — Advanced Cyber not selected'}
+                </div>
+                <div style={{fontSize:12,color:'rgba(255,255,255,.5)'}}>
+                  {d.advancedCyber ? 'MSA + Advanced Cyber + BCDR fully activated' : 'Antivirus only · No SOC · No BCDR · No patching · No PAM'}
+                </div>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:'.06em'}}>Worst-case exposure</div>
+                {d.advancedCyber
+                  ? <>
+                      <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'rgba(239,68,68,.5)',textDecoration:'line-through',lineHeight:1.1}}>$407,400</div>
+                      <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'#10B981',lineHeight:1.2}}>as low as $32,525</div>
+                      <div style={{fontSize:10,color:'rgba(16,185,129,.6)',marginTop:2}}>with full controls active</div>
+                    </>
+                  : <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'rgba(239,68,68,.85)',lineHeight:1.1}}>$407,400</div>
+                }
+                <div style={{fontSize:10,color:'rgba(255,255,255,.4)'}}>ASD & ICA Australia 2024–25</div>
+              </div>
+            </div>
+
+            {/* Breach score tiles */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8,marginBottom:12}}>
+              <div style={{background:d.advancedCyber?'rgba(16,185,129,.08)':'rgba(239,68,68,.06)',borderRadius:8,padding:'10px 12px',border:`1px solid ${d.advancedCyber?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'}`}}>
+                <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:18,color:d.advancedCyber?'#10B981':'#EF4444'}}>{d.advancedCyber?'5':'95'}<span style={{fontSize:12,fontWeight:400}}>/100</span></div>
+                <div style={{fontSize:11,color:'rgba(255,255,255,.6)',marginTop:2}}>Breach likelihood</div>
+                <div style={{marginTop:4,display:'inline-block',background:d.advancedCyber?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)',color:d.advancedCyber?'#6EE7B7':'#FCA5A5',fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:4}}>{d.advancedCyber?'LOW':'CRITICAL'}</div>
+              </div>
+              <div style={{background:d.advancedCyber?'rgba(16,185,129,.08)':'rgba(239,68,68,.06)',borderRadius:8,padding:'10px 12px',border:`1px solid ${d.advancedCyber?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'}`}}>
+                <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:14,color:d.advancedCyber?'#10B981':'#F59E0B'}}>{d.advancedCyber?'$32k–$91k':'$145k–$407k'}</div>
+                <div style={{fontSize:11,color:'rgba(255,255,255,.6)',marginTop:2}}>Estimated cost range</div>
+                {d.advancedCyber&&<div style={{fontSize:11,color:'#10B981',marginTop:4}}>↓ $316k reduction</div>}
+              </div>
+              <div style={{background:d.advancedCyber?'rgba(16,185,129,.08)':'rgba(239,68,68,.06)',borderRadius:8,padding:'10px 12px',border:`1px solid ${d.advancedCyber?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'}`}}>
+                <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:18,color:d.advancedCyber?'#10B981':'#EF4444'}}>{d.advancedCyber?'1.0×':'2.5×'}</div>
+                <div style={{fontSize:11,color:'rgba(255,255,255,.6)',marginTop:2}}>Regulatory exposure</div>
+                <div style={{marginTop:4,display:'inline-block',background:d.advancedCyber?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)',color:d.advancedCyber?'#6EE7B7':'#FCA5A5',fontSize:10,fontWeight:700,padding:'1px 6px',borderRadius:4}}>{d.advancedCyber?'STANDARD':'CRITICAL EXPOSURE'}</div>
+              </div>
+            </div>
+
+            {/* Control badges */}
+            <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginBottom:8}}>{d.advancedCyber?'Controls active:':'Risk contributors without full controls:'}</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+              {d.advancedCyber
+                ? [['MSA — EDR + Patching','−30 pts'],['Managed SOC','−14 pts'],['PAM','−8 pts'],['Password Manager','−5 pts'],['Dark Web Monitor','−4 pts'],['BCDR','−24 pts']].map(([l,v])=>(
+                    <div key={l} style={{fontSize:11,fontWeight:600,color:'#10B981',background:'rgba(16,185,129,.1)',borderRadius:6,padding:'3px 8px',border:'1px solid rgba(16,185,129,.2)'}}>✓ {l} {v}</div>
+                  ))
+                : ['▲ No SOC +30pts','▲ No patching +20pts','▲ No PAM +16pts','▲ No BCDR +15pts','▼ AV only −5pts'].map(f=>(
+                    <div key={f} style={{fontSize:11,fontWeight:600,color:f.startsWith('▼')?'#10B981':'#FCA5A5',background:f.startsWith('▼')?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)',borderRadius:6,padding:'3px 8px',border:`1px solid ${f.startsWith('▼')?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'}`}}>{f}</div>
+                  ))
+              }
+            </div>
+
+            {/* Bottom summary */}
+            {d.advancedCyber
+              ? <div style={{background:'rgba(16,185,129,.08)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(16,185,129,.2)'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'#10B981',marginBottom:6}}>✓ Full control suite active — risk reduced from 100 to 5/100</div>
+                  <div style={{display:'flex',gap:16,flexWrap:'wrap'}}>
+                    <div><span style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:15,color:'#10B981'}}>−95 pts</span><div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>Total risk reduction</div></div>
+                    <div><span style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:15,color:'#10B981'}}>CRITICAL → LOW</span><div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>Risk category</div></div>
+                    <div><span style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:15,color:'#10B981'}}>NDB compliant</span><div style={{fontSize:11,color:'rgba(255,255,255,.5)'}}>Notifiable Data Breaches</div></div>
+                  </div>
+                </div>
+              : <div style={{background:'rgba(239,68,68,.06)',borderRadius:8,padding:'10px 12px',border:'1px solid rgba(239,68,68,.2)'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'#FCA5A5',marginBottom:4}}>With all 32 Byte controls active, breach likelihood drops to 5/100</div>
+                  <div style={{fontSize:11,color:'rgba(255,255,255,.4)'}}>MSA + Advanced Cyber + BCDR combined reduce exposure by up to $316,175</div>
+                </div>
+            }
+            <div style={{marginTop:8,fontSize:11,color:'rgba(255,255,255,.3)'}}>ⓘ NDB Scheme: Once aware of a breach, you must notify the OAIC and all affected patients as soon as practicable.</div>
+          </div>
+        );
+      })()}
+      <div style={{display:'flex',gap:10,marginTop:12,marginBottom:4}}>
         <a href="https://32byte.com.au/calculator/" target="_blank" rel="noopener noreferrer"
           style={{flex:1,padding:'9px 12px',borderRadius:8,background:C.navyMid,color:C.textPrimary,fontSize:12,fontWeight:600,textDecoration:'none',textAlign:'center',border:`1px solid ${C.border}`}}>
           🧮 Dental IT ROI Calculator
