@@ -37,7 +37,68 @@ const PMS_LIST       = ['CareStack','Core Practice','D4W','Dentally','Exact','Oa
 const IMAGING_SW     = ['Vistasoft (Dürr)','Sidexis (Dentsply Sirona)','Romexis (Planmeca)','Carestream','Other'];
 const AU_STATES      = ['NSW','VIC','QLD','WA','SA','TAS','ACT','NT'];
 const FINANCE_OPTS   = ['Credabl','Medfin','BOQ Finance','NAB','MedX Finance','Other'];
-const NBN_TIERS      = ['100/40 Mbps Business','250/100 Mbps Business','500/200 Mbps Business','1000/400 Mbps Business'];
+const NBN_TIERS_BY_CLASS = {
+  'FTTP (Fibre to the Premises)': [
+    '── Residential ──',
+    'NBN 50 (Residential) — 50/20 Mbps',
+    'NBN 100 (Residential) — 100/20 Mbps',
+    'NBN 250 (Residential) — 250/25 Mbps',
+    'NBN 500 (Residential) — 500/50 Mbps',
+    'NBN 750 (Residential) — 750/50 Mbps',
+    'NBN 1000 (Residential) — 1000/100 Mbps',
+    'NBN 2000 (Residential) — 2000/200 Mbps',
+    '── Business ──',
+    'NBN 100/40 (Business) — 100/40 Mbps',
+    'NBN 250/100 (Business) — 250/100 Mbps',
+    'NBN 500/200 (Business) — 500/200 Mbps',
+    'NBN 1000/400 (Business) — 1000/400 Mbps',
+  ],
+  'FTTB (Fibre to the Building)': [
+    '── Residential ──',
+    'NBN 50 (Residential) — 50/20 Mbps',
+    'NBN 100 (Residential) — 100/20 Mbps',
+    '── Business ──',
+    'NBN 100/40 (Business) — 100/40 Mbps',
+    'NBN 250/100 (Business) — 250/100 Mbps',
+  ],
+  'FTTN (Fibre to the Node)': [
+    '── Residential ──',
+    'NBN 50 (Residential) — 50/20 Mbps',
+    'NBN 100 (Residential) — 100/20 Mbps',
+    '── Business ──',
+    'NBN 100/40 (Business) — 100/40 Mbps',
+  ],
+  'HFC (Hybrid Fibre Coaxial)': [
+    '── Residential ──',
+    'NBN 50 (Residential) — 50/20 Mbps',
+    'NBN 100 (Residential) — 100/20 Mbps',
+    'NBN 250 (Residential) — 250/25 Mbps',
+    'NBN 500 (Residential) — 500/50 Mbps',
+    'NBN 750 (Residential) — 750/50 Mbps',
+    'NBN 1000 (Residential) — 1000/50 Mbps',
+    '── Business ──',
+    'NBN 100/40 (Business) — 100/40 Mbps',
+    'NBN 250/100 (Business) — 250/100 Mbps',
+    'NBN 500/200 (Business) — 500/200 Mbps',
+    'NBN 1000/400 (Business) — 1000/400 Mbps',
+  ],
+  'Fixed Wireless': [
+    '── Residential ──',
+    'NBN 50 (Residential) — 50/20 Mbps',
+    'NBN 100 (Residential) — 100/20 Mbps',
+    '── Business ──',
+    'NBN 100/40 (Business) — 100/40 Mbps',
+  ],
+  'NBN Enterprise Ethernet (FTTP only)': [
+    'Business Fibre Entry — 100/100 Mbps',
+    'EE 250 — 250/250 Mbps',
+    'EE 500 — 500/500 Mbps',
+    'EE 1000 — 1000/1000 Mbps',
+    'EE 2000 — 2000/2000 Mbps',
+    'EE 5000 — 5000/5000 Mbps',
+    'EE 10000 — 10000/10000 Mbps',
+  ],
+};
 const VENDOR_TYPES   = ['Builder / Fitout','Electrician','Dental Chair Supplier','X-ray / OPG / CBCT Supplier','Intraoral Scanner Supplier','Imaging Software Vendor','PMS Vendor','Other'];
 const INSTALL_RESP   = ['32 Byte','Vendor','TBD'];
 const MONITOR_OPTS   = ['No Monitor','24" HD','27" QHD'];
@@ -88,12 +149,15 @@ const guessCpuYear = (cpu) => {
 
   // Intel Xeon
   if(c.includes('XEON')) {
+    if(c.includes('4410Y')||c.includes('4410')) return 2023; // Xeon Silver 4410Y Jan 2023
     if(c.match(/W-2[0-9]{3}/)||c.match(/SILVER 4[12]/)) return 2019;
     if(c.match(/E5-2[0-9]{3}/)) return 2013;
     if(c.match(/E-2[0-9]{3}/)) return 2018;
-    if(c.match(/SILVER 42[0-9]{2}/)) return 2020;
+    if(c.match(/SILVER 42[0-9]{2}/)||c.match(/SILVER 44[0-9]{2}/)) return 2022;
     return 2016;
   }
+  // Qualcomm Snapdragon
+  if(c.includes('SNAPDRAGON')||c.includes('X1P')||c.includes('X ELITE')||c.includes('X PLUS')) return 2024;
 
   // Intel Celeron / Pentium
   if(c.includes('J4125')||c.includes('J4105')) return 2019;
@@ -146,7 +210,11 @@ const Select = ({ value, onChange, options, placeholder }) => (
     <select value={value} onChange={e=>onChange(e.target.value)}
       style={{ ...ib, appearance:'none', cursor:'pointer', paddingRight:34, color:value?C.textPrimary:C.textMuted }} onFocus={fo} onBlur={bl}>
       {placeholder&&<option value="">{placeholder}</option>}
-      {options.map(o=><option key={o.v||o} value={o.v||o}>{o.l||o}</option>)}
+      {options.map(o=>{
+        const val=o.v||o; const label=o.l||o;
+        const isSep = typeof o==='string' && o.startsWith('──');
+        return <option key={val} value={isSep?'':val} disabled={isSep} style={isSep?{color:'#888',fontStyle:'italic'}:{}}>{label}</option>;
+      })}
     </select>
     <span style={{ position:'absolute', right:11, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:C.textMuted, fontSize:11 }}>▼</span>
   </div>
@@ -547,11 +615,29 @@ const Phase1 = ({ d, u }) => {
 // ── Phase 2 ───────────────────────────────────────────────────────────────────
 const Phase2 = ({ d, u }) => {
   const vendors = d.vendors||[];
+  const [collapsed, setCollapsed] = React.useState({});
+  const [dragIdx,   setDragIdx]   = React.useState(null);
+  const [dragOver,  setDragOver]  = React.useState(null);
+
   const addV  = () => u('vendors',[...vendors,{ id:uid(), type:'', company:'', contact:'', phone:'', email:'', installResp:'TBD', notes:'' }]);
   const updV  = (id,k,v) => u('vendors', vendors.map(x=>x.id===id?{...x,[k]:v}:x));
   const delV  = id => u('vendors', vendors.filter(x=>x.id!==id));
   const imgV  = vendors.filter(v=>['Imaging Software Vendor','X-ray / OPG / CBCT Supplier','Intraoral Scanner Supplier','PMS Vendor'].includes(v.type));
   const vendorsInScope = d.q1req !== false || d.practiceType === 'new';
+
+  const toggleCollapse = id => setCollapsed(c=>({...c,[id]:!c[id]}));
+
+  const onDragStart = i => setDragIdx(i);
+  const onDragOver  = (e,i) => { e.preventDefault(); setDragOver(i); };
+  const onDrop      = i => {
+    if(dragIdx===null || dragIdx===i) { setDragIdx(null); setDragOver(null); return; }
+    const arr = [...vendors];
+    const [moved] = arr.splice(dragIdx, 1);
+    arr.splice(i, 0, moved);
+    u('vendors', arr);
+    setDragIdx(null); setDragOver(null);
+  };
+
   return (
     <div>
       <PhaseHeader num={2} title="External Vendors" sub="Everyone else on this project. Get contacts early and lock down install responsibilities." />
@@ -566,41 +652,77 @@ const Phase2 = ({ d, u }) => {
       )}
       <InfoBox type="warn"><strong>Key rule:</strong> 32 Byte installs all imaging software (Vistasoft, Sidexis, Romexis etc) — not the equipment vendor. Confirm and resolve any conflicts now.</InfoBox>
       {vendors.length===0 && <div style={{ textAlign:'center', padding:'24px 0', color:C.textMuted, fontSize:14 }}>No vendors added yet. Start with the builder.</div>}
-      {vendors.map((v,i)=>(
-        <Card key={v.id}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-            <span style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:15, color:C.textPrimary }}>Vendor {i+1}{v.type?` · ${v.type}`:''}</span>
-            <button onClick={()=>delV(v.id)} style={{ fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
-          </div>
-          <Row>
-            <Field label="Vendor Type" tight><Select value={v.type} onChange={val=>updV(v.id,'type',val)} options={VENDOR_TYPES} placeholder="Select type…" /></Field>
-            <Field label="Company Name" tight><Input value={v.company} onChange={val=>updV(v.id,'company',val)} placeholder="Company name" /></Field>
-          </Row>
-          {v.type==='Other' && (
-            <Field label="Specify Vendor Type" tight hint="Describe the type of vendor">
-              <Input value={v.customType||''} onChange={val=>updV(v.id,'customType',val)} placeholder="e.g. Dental equipment supplier, IT cabling contractor…" />
-            </Field>
-          )}
-          <Row cols={3}>
-            <Field label="Contact Name" tight><Input value={v.contact} onChange={val=>updV(v.id,'contact',val)} placeholder="Name" /></Field>
-            <Field label="Phone" tight><Input value={v.phone} onChange={val=>updV(v.id,'phone',val)} placeholder="04xx xxx xxx" /></Field>
-            <Field label="Email" tight><Input value={v.email} onChange={val=>updV(v.id,'email',val)} placeholder="contact@vendor.com" /></Field>
-          </Row>
-          {['Imaging Software Vendor','X-ray / OPG / CBCT Supplier','Intraoral Scanner Supplier','PMS Vendor'].includes(v.type) && (
-            <Field label="Software Install Responsibility" tight hint="Who installs the software on go-live day?">
-              <div style={{ display:'flex', gap:8, marginBottom:6 }}>
-                {INSTALL_RESP.map(r=>{
-                  const a=v.installResp===r;
-                  const col=r==='32 Byte'?C.green:r==='Vendor'?C.amber:C.gray400;
-                  return <button key={r} onClick={()=>updV(v.id,'installResp',r)} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?col:C.border}`, background:a?`${col}22`:C.surfaceHi, color:a?col:C.textPrimary }}>{r}</button>;
-                })}
+      {vendors.map((v,i)=>{
+        const isCollapsed = !!collapsed[v.id];
+        const isDragTarget = dragOver===i && dragIdx!==i;
+        const summary = [v.company, v.type].filter(Boolean).join(' · ') || 'Unnamed vendor';
+        return (
+          <div
+            key={v.id}
+            draggable
+            onDragStart={()=>onDragStart(i)}
+            onDragOver={e=>onDragOver(e,i)}
+            onDrop={()=>onDrop(i)}
+            onDragEnd={()=>{setDragIdx(null);setDragOver(null);}}
+            style={{ marginBottom:10, borderRadius:12, border:`1.5px solid ${isDragTarget?C.orange:C.border}`, background:C.surface, opacity:dragIdx===i?.5:1, transition:'border-color .15s' }}
+          >
+            {/* Card header — always visible */}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 14px', cursor:'pointer', userSelect:'none' }}
+              onClick={()=>toggleCollapse(v.id)}>
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                <span style={{ fontSize:16, color:C.textMuted, cursor:'grab' }} title="Drag to reorder">⠿</span>
+                <div>
+                  <span style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:14, color:C.textPrimary }}>
+                    {v.company || v.type || (v.customType) || `Vendor ${i+1}`}
+                  </span>
+                  {v.company && v.type && <span style={{ fontSize:12, color:C.textSecondary, marginLeft:8 }}>{v.type}</span>}
+                </div>
               </div>
-              {v.installResp==='Vendor'&&<InfoBox type="alert">Conflict — vendor expects to install software. Coordinate with 32 Byte immediately. This may impact the installation schedule.</InfoBox>}
-            </Field>
-          )}
-          <Field label="Notes" tight><Input value={v.notes} onChange={val=>updV(v.id,'notes',val)} placeholder="Lead times, scheduling constraints, access requirements…" /></Field>
-        </Card>
-      ))}
+              <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                {v.installResp && v.installResp!=='TBD' && (
+                  <span style={{ fontSize:11, fontWeight:700, color:v.installResp==='Vendor'?C.red:v.installResp==='32 Byte'?C.green:C.amber, background:v.installResp==='Vendor'?'rgba(239,68,68,.1)':v.installResp==='32 Byte'?'rgba(16,185,129,.1)':'rgba(245,158,11,.1)', padding:'2px 8px', borderRadius:6 }}>{v.installResp}</span>
+                )}
+                <button onClick={e=>{e.stopPropagation();delV(v.id);}} style={{ fontSize:11, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
+                <span style={{ fontSize:13, color:C.textMuted }}>{isCollapsed?'▶':'▼'}</span>
+              </div>
+            </div>
+
+            {/* Collapsible body */}
+            {!isCollapsed && (
+              <div style={{ padding:'0 14px 14px', borderTop:`1px solid ${C.border}` }}>
+                <div style={{ height:12 }} />
+                <Row>
+                  <Field label="Vendor Type" tight><Select value={v.type} onChange={val=>updV(v.id,'type',val)} options={VENDOR_TYPES} placeholder="Select type…" /></Field>
+                  <Field label="Company Name" tight><Input value={v.company} onChange={val=>updV(v.id,'company',val)} placeholder="Company name" /></Field>
+                </Row>
+                {v.type==='Other' && (
+                  <Field label="Specify Vendor Type" tight hint="Describe the type of vendor">
+                    <Input value={v.customType||''} onChange={val=>updV(v.id,'customType',val)} placeholder="e.g. Dental equipment supplier, IT cabling contractor…" />
+                  </Field>
+                )}
+                <Row cols={3}>
+                  <Field label="Contact Name" tight><Input value={v.contact} onChange={val=>updV(v.id,'contact',val)} placeholder="Name" /></Field>
+                  <Field label="Phone" tight><Input value={v.phone} onChange={val=>updV(v.id,'phone',val)} placeholder="04xx xxx xxx" /></Field>
+                  <Field label="Email" tight><Input value={v.email} onChange={val=>updV(v.id,'email',val)} placeholder="contact@vendor.com" /></Field>
+                </Row>
+                {['Imaging Software Vendor','X-ray / OPG / CBCT Supplier','Intraoral Scanner Supplier','PMS Vendor'].includes(v.type) && (
+                  <Field label="Software Install Responsibility" tight hint="Who installs the software on go-live day?">
+                    <div style={{ display:'flex', gap:8, marginBottom:6 }}>
+                      {INSTALL_RESP.map(r=>{
+                        const a=v.installResp===r;
+                        const col=r==='32 Byte'?C.green:r==='Vendor'?C.amber:C.gray400;
+                        return <button key={r} onClick={()=>updV(v.id,'installResp',r)} style={{ flex:1, padding:'8px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?col:C.border}`, background:a?`${col}22`:C.surfaceHi, color:a?col:C.textPrimary }}>{r}</button>;
+                      })}
+                    </div>
+                    {v.installResp==='Vendor'&&<InfoBox type="alert">Conflict — vendor expects to install software. Coordinate with 32 Byte immediately. This may impact the installation schedule.</InfoBox>}
+                  </Field>
+                )}
+                <Field label="Notes" tight><Input value={v.notes} onChange={val=>updV(v.id,'notes',val)} placeholder="Lead times, scheduling constraints, access requirements…" /></Field>
+              </div>
+            )}
+          </div>
+        );
+      })}
       <button onClick={addV} style={{ width:'100%', padding:'12px', borderRadius:10, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:14, cursor:'pointer', marginTop:4 }}>+ Add Vendor</button>
       {imgV.length>0&&(
         <>
@@ -629,7 +751,7 @@ const Phase3 = ({ d, u }) => {
   const [importAllRows, setImportAllRows] = useState([]);
   const [importSearch, setImportSearch] = useState('');
 
-  const addR  = () => u('rooms',[...rooms,{ id:uid(), name:'', deviceType:'practice', qty:1, monitor:'No Monitor', kbMouse:false, database:false, notes:'', existingPC:false, pcAge:'', pcBrand:'', pcCondition:'Functional', pcNotes:'' }]);
+  const addR  = () => u('rooms',[...rooms,{ id:uid(), name:'', deviceType:'practice', qty:1, monitor:'No Monitor', kbMouse:false, database:false, notes:'', existingPC:false, pcAge:'', pcBrand:'', pcCondition:'Functional', pcNotes:'', pcSerial:'', pcCategory:'' }]);
   const updR  = (id,k,v) => u('rooms', rooms.map(x=>x.id===id?{...x,[k]:v}:x));
   const delR  = id => u('rooms', rooms.filter(x=>x.id!==id));
   const totalD = rooms.reduce((a,r)=>a+n(r.qty),0);
@@ -732,7 +854,8 @@ const Phase3 = ({ d, u }) => {
         monitor: 'No Monitor',
         kbMouse: false,
         database: false,
-        notes: [dev.serial?`S/N: ${dev.serial}`:''].filter(Boolean).join(' | '),
+        notes: '',
+        pcSerial: dev.serial || '',
         existingPC: true,
         pcBrand: dev.model || dev.name,
         pcAge: '',
@@ -887,17 +1010,47 @@ const Phase3 = ({ d, u }) => {
       )}
 
       {/* Room cards */}
-      {rooms.length>1&&(
-        <div style={{display:'flex',gap:8,marginBottom:12,justifyContent:'flex-end'}}>
-          <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:true})))} style={{padding:'6px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊟ Collapse All</button>
-          <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{padding:'6px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊞ Expand All</button>
-        </div>
-      )}
-      {rooms.length===0&&<div style={{ textAlign:'center', padding:'28px 0', color:C.textMuted, fontSize:14 }}>No rooms yet. Start with reception.</div>}
-      {rooms.map((r,i)=>{
+      {(()=>{
+        const getCategory = r => {
+          if(r.pcCategory) return r.pcCategory;
+          if(r.pcOs&&r.pcOs.toLowerCase().includes('server')) return 'Server';
+          if(r.deviceType&&(r.deviceType.includes('laptop')||r.deviceType.includes('il-'))) return 'Laptop';
+          return 'Desktop';
+        };
+        const [deviceFilter, setDeviceFilter] = React.useState('All');
+        const filters = ['All','Desktop','Laptop','Server'];
+        const filtered = rooms.filter(r => deviceFilter==='All' || getCategory(r)===deviceFilter);
+        return (<>
+          {rooms.length>0&&(
+            <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
+              <div style={{display:'flex',gap:4}}>
+                {filters.map(f=>{
+                  const count = f==='All' ? rooms.length : rooms.filter(r=>getCategory(r)===f).length;
+                  const active = deviceFilter===f;
+                  return (
+                    <button key={f} onClick={()=>setDeviceFilter(f)}
+                      style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${active?C.orange:C.border}`,background:active?C.orangeLight:'transparent',color:active?C.orange:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>
+                      {f}{count>0&&f!=='All'?` (${count})`:f==='All'?` (${count})`:''}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+                <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:true})))} style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊟ Collapse All</button>
+                <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊞ Expand All</button>
+              </div>
+            </div>
+          )}
+          {rooms.length===0&&<div style={{ textAlign:'center', padding:'28px 0', color:C.textMuted, fontSize:14 }}>No rooms yet. Start with reception.</div>}
+          {filtered.map((r,i)=>{
         const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
+        const inferredAgeC = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
+        const ageC = parseInt(r.pcAge)||inferredAgeC||0;
+        const cardBorderColor = r.existingPC && (r.replacePC || ageC>=5) ? C.red
+          : r.existingPC && (ageC>=3 || (r.pcOs && !r.pcOs.includes('Windows 11') && !r.pcOs.includes('Server') && !r.pcOs.includes('macOS') && r.pcOs) || (r.pcOs && r.pcOs.includes('Server 2016'))) ? C.amber
+          : dev.imaging ? C.orangeBorder : C.gray200;
         return (
-          <Card key={r.id} style={{ borderColor:dev.imaging?C.orangeBorder:C.gray200 }}>
+          <Card key={r.id} style={{ borderColor: cardBorderColor }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:r.collapsed?0:14 }}>
               <div style={{flex:1,cursor:'pointer'}} onClick={()=>updR(r.id,'collapsed',!r.collapsed)}>
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
@@ -905,15 +1058,47 @@ const Phase3 = ({ d, u }) => {
                   <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:15, color:C.textPrimary }}>{r.name||`Room ${i+1}`}{r.deviceName?<span style={{fontWeight:400,color:C.textSecondary,fontSize:13}}> · {r.deviceName}</span>:''}</div>
                 </div>
                 {r.collapsed && <div style={{ marginTop:4, marginLeft:20 }}>
-                  <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
-                  {r.existingPC&&<Pill label={`Existing${r.pcAge?' · '+r.pcAge+'yr':''}`} color={C.gray600} />}
-                  {r.replacePC&&<Pill label="Replace" color={C.orange} />}
+                  {r.existingPC
+                    ? <>
+                        <Pill label={r.pcHasGpu?'GPU Workstation':r.pcOs&&r.pcOs.toLowerCase().includes('server')?'Server':'Desktop PC'} color={C.navyMid} />
+                        {r.pcBrand&&<Pill label={r.pcBrand} color={C.gray600} />}
+                        {r.pcCpu&&<Pill label={r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@\s*[\d.]+\s*GHz/gi,'').replace(/\s+/g,' ').trim()} color={C.gray600} />}
+                        {r.pcRam&&<Pill label={r.pcRam} color={C.gray600} />}
+                        {r.pcStorage&&<Pill label={r.pcStorage} color={C.gray600} />}
+                        {r.pcOs&&<Pill label={r.pcOs} color={r.pcOs.includes('Windows 11')||r.pcOs==='macOS'?C.navyMid:r.pcOs.includes('Server 2022')||r.pcOs.includes('Server 2019')?C.navyMid:r.pcOs.includes('Server')?C.amber:C.red} />}
+                        {r.pcHasGpu&&r.pcGpuModel&&<Pill label={r.pcGpuModel} color={C.amber} />}
+                        {r.pcSerial&&<Pill label={`S/N: ${r.pcSerial}`} color={C.gray600} />}
+                        {r.replacePC&&<Pill label="Replace" color={C.orange} />}
+                      </>
+                    : <>
+                        <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
+                        {dev.gpu&&dev.gpu!=='None'&&<Pill label={dev.gpu} color={C.amber} />}
+                        {r.monitor&&r.monitor!=='No Monitor'&&<Pill label={r.monitor} color={C.navyMid} />}
+                        {r.kbMouse&&<Pill label="KB+Mouse" color={C.navyMid} />}
+                        {r.database&&<Pill label="RAID" color={C.amber} />}
+                      </>
+                  }
                 </div>}
                 {!r.collapsed && <div style={{ marginTop:4 }}>
-                  <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
-                  {dev.gpu!=='None'&&<Pill label={dev.gpu} color={C.gray600} />}
-                  {r.database&&<Pill label="RAID Storage" color={C.amber} />}
-                  {r.monitor&&r.monitor!=='No Monitor'&&<Pill label={r.monitor} color={C.navyMid} />}
+                  {r.existingPC
+                    ? <>
+                        <Pill label={r.pcHasGpu?'GPU Workstation':r.pcOs&&r.pcOs.toLowerCase().includes('server')?'Server':'Desktop PC'} color={C.navyMid} />
+                        {r.pcBrand&&<Pill label={r.pcBrand} color={C.gray600} />}
+                        {r.pcCpu&&<Pill label={r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@\s*[\d.]+\s*GHz/gi,'').replace(/\s+/g,' ').trim()} color={C.gray600} />}
+                        {r.pcRam&&<Pill label={r.pcRam} color={C.gray600} />}
+                        {r.pcStorage&&<Pill label={r.pcStorage} color={C.gray600} />}
+                        {r.pcOs&&<Pill label={r.pcOs} color={r.pcOs.includes('Windows 11')||r.pcOs==='macOS'?C.navyMid:r.pcOs.includes('Server 2022')||r.pcOs.includes('Server 2019')?C.navyMid:r.pcOs.includes('Server')?C.amber:C.red} />}
+                        {r.pcHasGpu&&r.pcGpuModel&&<Pill label={r.pcGpuModel} color={C.amber} />}
+                        {r.database&&<Pill label="RAID" color={C.amber} />}
+                      </>
+                    : <>
+                        <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
+                        {dev.gpu&&dev.gpu!=='None'&&<Pill label={dev.gpu} color={C.amber} />}
+                        {r.database&&<Pill label="RAID Storage" color={C.amber} />}
+                        {r.monitor&&r.monitor!=='No Monitor'&&<Pill label={r.monitor} color={C.navyMid} />}
+                        {r.kbMouse&&<Pill label="KB+Mouse" color={C.navyMid} />}
+                      </>
+                  }
                 </div>}
               </div>
               <button onClick={()=>delR(r.id)} style={{ fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
@@ -947,6 +1132,21 @@ const Phase3 = ({ d, u }) => {
                       <Input type="number" value={r.pcAge||''} onChange={v=>updR(r.id,'pcAge',v)} placeholder={inferredAge?`~${inferredAge} (auto)`:'e.g. 3'} />
                     </Field>
                   </Row>
+                  <Row>
+                    <Field label="Device Category" tight hint="Auto-detected — override if needed">
+                      {(()=>{
+                        const autoCategory = r.pcOs&&r.pcOs.toLowerCase().includes('server') ? 'Server'
+                          : (r.deviceType&&(r.deviceType.includes('laptop')||r.deviceType.includes('il-'))) ? 'Laptop'
+                          : 'Desktop';
+                        const effective = r.pcCategory || autoCategory;
+                        return (
+                          <Select value={r.pcCategory||''} onChange={v=>updR(r.id,'pcCategory',v)}
+                            options={['Desktop','Laptop','Server']}
+                            placeholder={`${autoCategory} (auto-detected)`} />
+                        );
+                      })()}
+                    </Field>
+                  </Row>
                   {age>=5 && <InfoBox type="alert">⚠️ Device is ~{age} years old — likely end of life. Consider replacement.</InfoBox>}
                   {age>=3 && age<5 && <InfoBox type="warn">⚠️ Device is ~{age} years old — likely out of manufacturer warranty. Discuss support options.</InfoBox>}
                   <Row>
@@ -964,6 +1164,9 @@ const Phase3 = ({ d, u }) => {
                     </Field>
                   </Row>
                   {r.pcHasGpu && <Field label="GPU Model" tight><Input value={r.pcGpuModel||''} onChange={v=>updR(r.id,'pcGpuModel',v)} placeholder="e.g. NVIDIA RTX A1000, Quadro P2000" /></Field>}
+                  <Field label="Serial Number" tight hint="From BIOS / label on chassis">
+                    <Input value={r.pcSerial||''} onChange={v=>updR(r.id,'pcSerial',v)} placeholder="e.g. F2XKLN2" />
+                  </Field>
                   <Field label="Condition" tight>
                     <div style={{ display:'flex', gap:6 }}>
                       {['Good','Functional','Poor','Unknown'].map(c=>{
@@ -980,7 +1183,8 @@ const Phase3 = ({ d, u }) => {
                     </Field>
                     <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="Issues, imaging software, reuse potential…" /></Field>
                   </Row>
-                  {r.pcOs && !r.pcOs.includes('Windows 11') && !r.pcOs.includes('Server') && <InfoBox type="alert">⚠️ {r.pcOs} — not Windows 11. Upgrade or replacement recommended before go-live.</InfoBox>}
+                  {r.pcOs && !r.pcOs.includes('Windows 11') && !r.pcOs.includes('Server') && !r.pcOs.includes('macOS') && <InfoBox type="alert">⚠️ {r.pcOs} — not Windows 11. Upgrade or replacement recommended before go-live.</InfoBox>}
+                  {r.pcOs && r.pcOs.includes('Server 2016') && <InfoBox type="alert">⚠️ Windows Server 2016 reached end of support in January 2022. Upgrade to Server 2022 recommended.</InfoBox>}
                   <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
                     <Toggle checked={!!r.replacePC} onChange={v=>updR(r.id,'replacePC',v)}
                       label="Replace this computer"
@@ -1079,6 +1283,8 @@ const Phase3 = ({ d, u }) => {
           </Card>
         );
       })}
+        </>);
+      })()}
       <div style={{display:'flex',gap:8,marginBottom:22,flexWrap:'wrap'}}>
         <button onClick={addR} style={{ flex:1, minWidth:120, padding:'12px', borderRadius:10, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:14, cursor:'pointer' }}>+ Add Room</button>
         <button onClick={()=>setShowImport(true)} style={{ padding:'12px 14px', borderRadius:10, border:`2px solid ${C.navyMid}`, background:C.navyMid, color:C.white, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>⬆ Import</button>
@@ -1254,20 +1460,28 @@ const Phase3 = ({ d, u }) => {
           </div>
         )}
       </Field>
-      <Field label="Floor Plan / WiFi Design" hint="Upload a floor plan image for reference during AP placement discussions.">
+      <Field label="Floor Plan / WiFi Design" hint="Upload a floor plan or PDF for reference during AP placement discussions.">
         <div style={{ marginBottom:8 }}>
           <label style={{ display:'inline-block', padding:'9px 18px', borderRadius:8, border:`2px dashed ${C.border}`, background:C.surfaceHi, color:C.orange, fontWeight:600, fontSize:13, cursor:'pointer' }}>
             📎 Upload Floor Plan
-            <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{
+            <input type="file" accept="*/*" style={{ display:'none' }} onChange={e=>{
               const f=e.target.files[0]; if(!f) return;
+              u('floorPlanFileName', f.name);
               const r=new FileReader(); r.onload=ev=>u('floorPlanImage',ev.target.result); r.readAsDataURL(f);
             }} />
           </label>
-          {d.floorPlanImage && <button onClick={()=>u('floorPlanImage',null)} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
+          {d.floorPlanImage && <button onClick={()=>{const a=document.createElement('a');a.href=d.floorPlanImage;a.download=d.floorPlanFileName||'floor-plan';document.body.appendChild(a);a.click();document.body.removeChild(a);}} style={{ marginLeft:10, fontSize:12, color:C.orange, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>⬇ Download</button>}
+          {d.floorPlanImage && <button onClick={()=>{u('floorPlanImage',null);u('floorPlanFileName','');}} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
+          {d.floorPlanFileName && <span style={{marginLeft:10,fontSize:12,color:C.textSecondary}}>{d.floorPlanFileName}</span>}
         </div>
-        {d.floorPlanImage && (
+        {d.floorPlanImage && d.floorPlanImage.startsWith('data:image') && (
           <div style={{ borderRadius:10, overflow:'hidden', border:`1.5px solid ${C.border}`, maxHeight:400 }}>
             <img src={d.floorPlanImage} alt="Floor plan" style={{ width:'100%', display:'block', objectFit:'contain' }} />
+          </div>
+        )}
+        {d.floorPlanImage && !d.floorPlanImage.startsWith('data:image') && (
+          <div style={{padding:'10px 14px',background:C.surfaceHi,borderRadius:9,border:`1px solid ${C.border}`,fontSize:13,color:C.textSecondary}}>
+            📄 {d.floorPlanFileName||'File uploaded'} — use Download to view
           </div>
         )}
       </Field>
@@ -1283,20 +1497,28 @@ const Phase3 = ({ d, u }) => {
               <Select value={d.nvrStorage||''} onChange={v=>u('nvrStorage',v)} placeholder="Select…" options={['4 TB HDD','8 TB HDD (recommended)','12 TB HDD','16 TB HDD']} />
             </Field>
           </Row>
-          <Field label="Camera Layout / Location Diagram" hint="Upload a floor plan showing proposed camera positions." tight>
+          <Field label="Camera Layout / Location Diagram" hint="Upload a floor plan or PDF showing proposed camera positions." tight>
             <div style={{ marginBottom:8 }}>
               <label style={{ display:'inline-block', padding:'9px 18px', borderRadius:8, border:`2px dashed ${C.border}`, background:C.surface, color:C.orange, fontWeight:600, fontSize:13, cursor:'pointer' }}>
                 📎 Upload Camera Layout
-                <input type="file" accept="image/*" style={{ display:'none' }} onChange={e=>{
+                <input type="file" accept="*/*" style={{ display:'none' }} onChange={e=>{
                   const f=e.target.files[0]; if(!f) return;
+                  u('cameraLayoutFileName', f.name);
                   const r=new FileReader(); r.onload=ev=>u('cameraLayoutImage',ev.target.result); r.readAsDataURL(f);
                 }} />
               </label>
-              {d.cameraLayoutImage && <button onClick={()=>u('cameraLayoutImage',null)} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
+              {d.cameraLayoutImage && <button onClick={()=>{const a=document.createElement('a');a.href=d.cameraLayoutImage;a.download=d.cameraLayoutFileName||'camera-layout';document.body.appendChild(a);a.click();document.body.removeChild(a);}} style={{ marginLeft:10, fontSize:12, color:C.orange, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>⬇ Download</button>}
+              {d.cameraLayoutImage && <button onClick={()=>{u('cameraLayoutImage',null);u('cameraLayoutFileName','');}} style={{ marginLeft:10, fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>}
+              {d.cameraLayoutFileName && <span style={{marginLeft:10,fontSize:12,color:C.textSecondary}}>{d.cameraLayoutFileName}</span>}
             </div>
-            {d.cameraLayoutImage && (
+            {d.cameraLayoutImage && d.cameraLayoutImage.startsWith('data:image') && (
               <div style={{ borderRadius:10, overflow:'hidden', border:`1.5px solid ${C.border}`, maxHeight:400 }}>
                 <img src={d.cameraLayoutImage} alt="Camera layout" style={{ width:'100%', display:'block', objectFit:'contain' }} />
+              </div>
+            )}
+            {d.cameraLayoutImage && !d.cameraLayoutImage.startsWith('data:image') && (
+              <div style={{padding:'10px 14px',background:C.surfaceHi,borderRadius:9,border:`1px solid ${C.border}`,fontSize:13,color:C.textSecondary}}>
+                📄 {d.cameraLayoutFileName||'File uploaded'} — use Download to view
               </div>
             )}
           </Field>
@@ -1317,10 +1539,10 @@ const Phase3 = ({ d, u }) => {
 
       {/* Firewall */}
       <Divider label="Firewall & 4G Failover" />
-      <InfoBox>Firewall and 4G Failover are part of the network infrastructure. Both are enabled by default — toggle off if not required.</InfoBox>
+      <InfoBox>Select new services required. Toggle on if this is a new service being added for this practice.</InfoBox>
       <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
         <div>
-          <Toggle checked={!!d.firewall} onChange={v=>u('firewall',v)} label="UDM Pro Firewall" sub="All-in-one firewall, VPN, network controller — recommended for all practices" />
+          <Toggle checked={!!d.firewall} onChange={v=>u('firewall',v)} label="New UDM Pro Firewall" sub="All-in-one firewall, VPN, network controller — select if 32 Byte is supplying a new unit" />
           <Toggle checked={!!d.existingFirewall} onChange={v=>u('existingFirewall',v)} label="Existing firewall in place" sub={d.existingFirewall?'Capture details below':'No existing firewall'} />
           {d.existingFirewall && (
             <div style={{ marginLeft:54, marginTop:8, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
@@ -1332,7 +1554,7 @@ const Phase3 = ({ d, u }) => {
           )}
         </div>
         <div>
-          <Toggle checked={!!d.failover} onChange={v=>u('failover',v)} label="Teltonika TRB140 4G Failover Router" sub="Keeps the practice running if NBN drops — essential for cloud-based practices" />
+          <Toggle checked={!!d.failover} onChange={v=>u('failover',v)} label="New Teltonika TRB140 4G Failover Router" sub="Select if 32 Byte is supplying a new 4G failover unit for this practice" />
           <Toggle checked={!!d.existing4G} onChange={v=>u('existing4G',v)} label="Existing 4G backup in place" sub={d.existing4G?'Capture details below':'No existing 4G backup'} />
           {d.existing4G && (
             <div style={{ marginLeft:54, marginTop:8, padding:'12px 14px', background:C.surfaceHi, borderRadius:9, border:`1.5px solid ${C.border}` }}>
@@ -1349,10 +1571,7 @@ const Phase3 = ({ d, u }) => {
       {/* M365 */}
       <Divider label="Microsoft 365" />
       <InfoBox>Business Premium = named users (reception, PM, owner). F1 = shared device logins (treatment rooms). Laptop users → Business Premium.</InfoBox>
-      <Row>
-        <Field label="M365 Business Premium" hint="Named users — per user/month"><Num value={d.m365Premium||''} onChange={v=>u('m365Premium',v)} /></Field>
-        <Field label="M365 F1" hint="Shared device logins — per device/month"><Num value={d.m365F1||''} onChange={v=>u('m365F1',v)} /></Field>
-      </Row>
+
       <Toggle checked={!!d.existingM365} onChange={v=>u('existingM365',v)} label="Existing Microsoft 365 licences in place" sub={d.existingM365?'Capture licence details below':'No existing M365 tenancy'} />
       {d.existingM365 && (
         <div style={{ marginTop:12 }}>
@@ -1393,6 +1612,44 @@ const Phase3 = ({ d, u }) => {
           </Field>
         </div>
       )}
+
+      {/* New M365 users */}
+      <div style={{marginTop:12}}>
+        <Toggle checked={!!d.newM365Users} onChange={v=>u('newM365Users',v)} label="New M365 users to be created" sub={d.newM365Users?'Capture new user details below':'No new accounts required'} />
+        {d.newM365Users && (
+          <div style={{marginTop:12}}>
+            <InfoBox>Capture each new user account to be created. Username and licence are required — these will be set up by 32 Byte within a week of go-live day unless required earlier for setup and configuration.</InfoBox>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:13,color:C.textPrimary}}>New M365 Users</div>
+              <button onClick={()=>u('m365NewUsers',[...(d.m365NewUsers||[]),{id:uid(),name:'',username:'',email:'',licence:'',notes:''}])}
+                style={{padding:'6px 14px',borderRadius:7,background:C.orange,color:C.white,border:'none',fontSize:12,fontWeight:700,cursor:'pointer'}}>+ Add New User</button>
+            </div>
+            {(d.m365NewUsers||[]).length===0 && <div style={{textAlign:'center',padding:'16px 0',color:C.textMuted,fontSize:13}}>No new users added yet.</div>}
+            {(d.m365NewUsers||[]).map((mu,i)=>(
+              <div key={mu.id} style={{background:C.surfaceHi,borderRadius:9,border:`1px solid ${C.border}`,padding:'12px 14px',marginBottom:8}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+                  <span style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:13,color:C.textPrimary}}>{mu.name||`New User ${i+1}`}</span>
+                  <button onClick={()=>u('m365NewUsers',(d.m365NewUsers||[]).filter(x=>x.id!==mu.id))} style={{color:C.red,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:700}}>Remove</button>
+                </div>
+                <Row>
+                  <Field label="Full Name" tight><Input value={mu.name||''} onChange={v=>u('m365NewUsers',(d.m365NewUsers||[]).map(x=>x.id===mu.id?{...x,name:v}:x))} placeholder="e.g. Jane Smith" /></Field>
+                  <Field label="Username" tight hint="Without @domain"><Input value={mu.username||''} onChange={v=>u('m365NewUsers',(d.m365NewUsers||[]).map(x=>x.id===mu.id?{...x,username:v}:x))} placeholder="e.g. jsmith" /></Field>
+                </Row>
+                <Row>
+                  <Field label="Email Address" tight><Input value={mu.email||''} onChange={v=>u('m365NewUsers',(d.m365NewUsers||[]).map(x=>x.id===mu.id?{...x,email:v}:x))} placeholder="jsmith@practice.com" /></Field>
+                  <Field label="Licence" tight>
+                    {mu.licence==='Other'
+                      ? <Input value={mu.licenceOther||''} onChange={v=>u('m365NewUsers',(d.m365NewUsers||[]).map(x=>x.id===mu.id?{...x,licenceOther:v}:x))} placeholder="Describe licence…" />
+                      : <Select value={mu.licence||''} onChange={v=>u('m365NewUsers',(d.m365NewUsers||[]).map(x=>x.id===mu.id?{...x,licence:v}:x))}
+                          options={['Business Basic','Business Standard','Business Premium','Apps for Business','F1','F3','E3','E5','Other']} placeholder="Select licence…" />}
+                  </Field>
+                </Row>
+                <Field label="Notes" tight><Input value={mu.notes||''} onChange={v=>u('m365NewUsers',(d.m365NewUsers||[]).map(x=>x.id===mu.id?{...x,notes:v}:x))} placeholder="Role, department, special requirements…" /></Field>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* PS */}
       <Divider label="Professional Services — Quote 1" />
@@ -1454,64 +1711,204 @@ const Phase4 = ({ d, u }) => {
         </div>
       )}
       <Divider label="Internet Connection" />
-      <Field label="Connection Type">
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-          {[
-            {v:'nbn',    l:'Business NBN'},
-            {v:'fibre',  l:'Private Fibre'},
-            {v:'leased', l:'Leased Line'},
-            {v:'other',  l:'Other'},
-            {v:'none',   l:'None / TBC'},
-          ].map(o=>{
-            const a=(d.internetType||'nbn')===o.v;
-            return <button key={o.v} onClick={()=>u('internetType',o.v)} style={{ padding:'9px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o.l}</button>;
-          })}
-        </div>
-      </Field>
 
-      {(d.internetType||'nbn')==='nbn' && (
-        <div style={{ marginTop:4 }}>
-          <Field label="NBN Speed Tier" tight hint="250/100 recommended for most practices. 1000/400 for high-volume imaging or multi-site.">
-            <Select value={d.nbnTier||''} onChange={v=>u('nbnTier',v)} options={NBN_TIERS} placeholder="Select tier…" />
-          </Field>
-          <Field label="Tenancy Type" tight>
-            <div style={{ display:'flex', gap:8 }}>
-              {[{v:'new',l:'New tenancy'},{v:'existing',l:'Existing tenancy'}].map(o=>{
-                const a=d.tenancy===o.v;
-                return <button key={o.v} onClick={()=>u('tenancy',o.v)} style={{ flex:1, padding:'9px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o.l}</button>;
+      {/* New internet connection */}
+      <Toggle checked={!!d.newInternet} onChange={v=>u('newInternet',v)} label="New internet connection required" sub={d.newInternet?'32 Byte will arrange a new service for this practice':'No new connection required'} />
+      {d.newInternet && (
+        <div style={{marginTop:10,padding:'14px 16px',background:C.surfaceHi,borderRadius:9,border:`1px solid ${C.border}`,marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>New Connection Details</div>
+          <Field label="Connection Type" tight>
+            <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              {[
+                {v:'nbn',    l:'Business NBN'},
+                {v:'ee',     l:'Enterprise Ethernet'},
+                {v:'fibre',  l:'Private Fibre'},
+                {v:'other',  l:'Other'},
+              ].map(o=>{
+                const a=(d.internetType||'nbn')===o.v;
+                return <button key={o.v} onClick={()=>u('internetType',o.v)} style={{ padding:'9px 14px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o.l}</button>;
               })}
             </div>
           </Field>
-          {d.tenancy==='new'&&<InfoBox type="warn">New tenancy — NBN termination charge may apply (~$300 passthrough). 32 Byte will confirm with NBN co.</InfoBox>}
+
+          {(d.internetType||'nbn')==='nbn' && (
+            <>
+              <Field label="NBN Service Class" tight hint="Connection technology at this address">
+                <Select value={d.nbnServiceClass||''} onChange={v=>{u('nbnServiceClass',v);u('nbnTier','');}}
+                  options={['FTTP (Fibre to the Premises)','FTTB (Fibre to the Building)','FTTN (Fibre to the Node)','HFC (Hybrid Fibre Coaxial)','Fixed Wireless']}
+                  placeholder="Select service class first…" />
+              </Field>
+              {d.nbnServiceClass && (
+                <Field label="NBN Speed Tier" tight hint={d.nbnServiceClass.includes('FTTP')?'FTTP supports all residential and business NBN tiers. Select Enterprise Ethernet as the connection type for EE services.':d.nbnServiceClass.includes('Fixed Wireless')?'Fixed Wireless is limited to 100/40 Mbps maximum.':'Speed is limited by the copper or HFC infrastructure at this address.'}>
+                  <Select value={d.nbnTier||''} onChange={v=>u('nbnTier',v)}
+                    options={NBN_TIERS_BY_CLASS[d.nbnServiceClass]||[]}
+                    placeholder="Select speed tier…" />
+                </Field>
+              )}
+              {['FTTB (Fibre to the Building)','FTTN (Fibre to the Node)','HFC (Hybrid Fibre Coaxial)'].includes(d.nbnServiceClass) && (
+                <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 14px',background:'rgba(16,185,129,.06)',border:'1px solid rgba(16,185,129,.2)',borderRadius:9,marginBottom:8}}>
+                  <label style={{display:'flex',alignItems:'flex-start',gap:10,cursor:'pointer',userSelect:'none',flex:1}}>
+                    <input type="checkbox" checked={!!d.nbnFibreUpgradeEligible} onChange={e=>u('nbnFibreUpgradeEligible',e.target.checked)}
+                      style={{marginTop:2,accentColor:C.orange,width:16,height:16,flexShrink:0}} />
+                    <div>
+                      <div style={{fontSize:13,fontWeight:700,color:'#10B981',marginBottom:2}}>Site may be eligible for a free fibre upgrade (FTTP)</div>
+                      <div style={{fontSize:12,color:'rgba(255,255,255,.5)',lineHeight:1.5}}>Tick if the practice is in an NBN fibre upgrade zone — check nbnco.com.au. A free upgrade to FTTP may be available, unlocking faster speeds and Enterprise Ethernet tiers.</div>
+                    </div>
+                  </label>
+                </div>
+              )}
+              {/* NBN lookup bubble */}
+              <a href="https://www.nbnco.com.au/" target="_blank" rel="noopener noreferrer"
+                style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 14px',background:'rgba(30,56,105,.35)',border:`1px solid ${C.navyMid}`,borderRadius:9,textDecoration:'none',marginBottom:8}}>
+                <span style={{fontSize:18,flexShrink:0}}>🔍</span>
+                <div>
+                  <div style={{fontSize:12,fontWeight:700,color:C.orange,marginBottom:2}}>Not sure of service class? Check nbnco.com.au</div>
+                  <div style={{fontSize:12,color:C.textSecondary,lineHeight:1.5}}>Go to this website and type in the practice address to confirm the connection type before ordering.</div>
+                </div>
+                <span style={{marginLeft:'auto',fontSize:11,color:C.orange,flexShrink:0,alignSelf:'center'}}>↗ Open</span>
+              </a>
+              <Field label="Tenancy Type" tight>
+                <div style={{ display:'flex', gap:8 }}>
+                  {[{v:'new',l:'New tenancy'},{v:'existing',l:'Existing tenancy'}].map(o=>{
+                    const a=d.tenancy===o.v;
+                    return <button key={o.v} onClick={()=>u('tenancy',o.v)} style={{ flex:1, padding:'9px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary }}>{o.l}</button>;
+                  })}
+                </div>
+              </Field>
+              {d.tenancy==='new'&&<InfoBox type="warn">New tenancy — NBN termination charge may apply (~$300 passthrough). 32 Byte will confirm with NBN co.</InfoBox>}
+              {d.tenancy==='existing'&&(
+                <Field label="AVC ID" tight hint="Access Virtual Circuit ID — found in the existing ISP portal or on the NBN connection notice">
+                  <Input value={d.nbnAVC||''} onChange={v=>u('nbnAVC',v)} placeholder="e.g. AVC123456789" />
+                </Field>
+              )}
+            </>
+          )}
+
+          {d.internetType==='ee' && (
+            <>
+              <Field label="Service Class" tight hint="Enterprise Ethernet requires FTTP at the premises">
+                <Select value={d.nbnServiceClass||''} onChange={v=>{u('nbnServiceClass',v);u('nbnTier','');}}
+                  options={['NBN Enterprise Ethernet (FTTP only)']}
+                  placeholder="Select EE class…" />
+              </Field>
+              {d.nbnServiceClass && (
+                <Field label="EE Speed Tier" tight hint="Symmetric speeds — same upload and download">
+                  <Select value={d.nbnTier||''} onChange={v=>u('nbnTier',v)}
+                    options={NBN_TIERS_BY_CLASS['NBN Enterprise Ethernet (FTTP only)']||[]}
+                    placeholder="Select EE tier…" />
+                </Field>
+              )}
+              <Field label="Tenancy Type" tight>
+                <div style={{display:'flex',gap:8}}>
+                  {[{v:'new',l:'New tenancy'},{v:'existing',l:'Existing tenancy'}].map(o=>{
+                    const a=d.tenancy===o.v;
+                    return <button key={o.v} onClick={()=>u('tenancy',o.v)} style={{flex:1,padding:'9px',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',border:`2px solid ${a?C.orange:C.gray200}`,background:a?C.orangeLight:C.surfaceHi,color:a?C.orange:C.textSecondary}}>{o.l}</button>;
+                  })}
+                </div>
+              </Field>
+              {d.tenancy==='existing'&&<Field label="AVC ID" tight hint="Access Virtual Circuit ID"><Input value={d.nbnAVC||''} onChange={v=>u('nbnAVC',v)} placeholder="e.g. AVC123456789" /></Field>}
+            </>
+          )}
+
+          {d.internetType==='fibre' && (
+            <>
+              <Row>
+                <Field label="Provider" tight><Input value={d.fibreProvider||''} onChange={v=>u('fibreProvider',v)} placeholder="e.g. Telstra, Vocus, Aussie BB" /></Field>
+                <Field label="Speed" tight>
+                  <Select value={d.fibreSpeed||''} onChange={v=>u('fibreSpeed',v)} placeholder="Select speed…"
+                    options={['100/100 Mbps','250/250 Mbps','500/500 Mbps','1000/1000 Mbps','10 Gbps','Other']} />
+                </Field>
+              </Row>
+              {d.fibreSpeed==='Other' && <Field label="Custom Speed" tight><Input value={d.customSpeed||''} onChange={v=>u('customSpeed',v)} placeholder="e.g. 200/200 Mbps" /></Field>}
+              <Field label="Contract Expiry" tight><DatePicker value={d.internetExpiry||''} onChange={v=>u('internetExpiry',v)} /></Field>
+            </>
+          )}
+
+          {d.internetType==='other' && (
+            <>
+              <Row>
+                <Field label="Connection Description" tight><Input value={d.otherInternetDesc||''} onChange={v=>u('otherInternetDesc',v)} placeholder="Describe the connection type" /></Field>
+                <Field label="Speed" tight><Input value={d.customSpeed||''} onChange={v=>u('customSpeed',v)} placeholder="e.g. 100/100 Mbps" /></Field>
+              </Row>
+              <Field label="Provider" tight><Input value={d.fibreProvider||''} onChange={v=>u('fibreProvider',v)} placeholder="Provider name" /></Field>
+            </>
+          )}
         </div>
       )}
 
-      {(d.internetType==='fibre'||d.internetType==='leased') && (
-        <div style={{ marginTop:4 }}>
+      {/* Existing internet connection */}
+      <Toggle checked={!!d.existingInternet} onChange={v=>u('existingInternet',v)} label="Existing internet connection in place" sub={d.existingInternet?'Capture current service details below':'No existing connection'} />
+      {d.existingInternet && (
+        <div style={{marginTop:10,padding:'14px 16px',background:C.surfaceHi,borderRadius:9,border:`1px solid ${C.border}`,marginBottom:12}}>
+          <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Existing Connection Details</div>
           <Row>
-            <Field label="Provider" tight><Input value={d.fibreProvider||''} onChange={v=>u('fibreProvider',v)} placeholder="e.g. Telstra, Vocus, Aussie BB" /></Field>
-            <Field label="Speed" tight>
-              <Select value={d.fibreSpeed||''} onChange={v=>u('fibreSpeed',v)} placeholder="Select speed…"
-                options={['100/100 Mbps','250/250 Mbps','500/500 Mbps','1000/1000 Mbps','10 Gbps','Other']} />
+            <Field label="Provider" tight><Input value={d.existingISP||''} onChange={v=>u('existingISP',v)} placeholder="e.g. Telstra, Aussie BB, TPG" /></Field>
+            <Field label="Connection Type" tight>
+              <Select value={d.existingInternetType||''} onChange={v=>u('existingInternetType',v)} placeholder="Select…"
+                options={['Business NBN — FTTP','Business NBN — FTTB','Business NBN — FTTN','Business NBN — HFC','Business NBN — Fixed Wireless','Private Fibre','Leased Line','4G/5G Fixed Wireless','Other']} />
             </Field>
           </Row>
-          {d.fibreSpeed==='Other' && <Field label="Custom Speed" tight><Input value={d.customSpeed||''} onChange={v=>u('customSpeed',v)} placeholder="e.g. 200/200 Mbps" /></Field>}
-          <Field label="Contract Expiry" tight><DatePicker value={d.internetExpiry||''} onChange={v=>u('internetExpiry',v)} /></Field>
-        </div>
-      )}
-
-      {d.internetType==='other' && (
-        <div style={{ marginTop:4 }}>
           <Row>
-            <Field label="Connection Description" tight><Input value={d.otherInternetDesc||''} onChange={v=>u('otherInternetDesc',v)} placeholder="Describe the connection type" /></Field>
-            <Field label="Speed" tight><Input value={d.customSpeed||''} onChange={v=>u('customSpeed',v)} placeholder="e.g. 100/100 Mbps" /></Field>
+            <Field label="Speed Tier" tight><Input value={d.existingInternetSpeed||''} onChange={v=>u('existingInternetSpeed',v)} placeholder="e.g. 250/100 Mbps" /></Field>
+            <Field label="Contract Expiry" tight><DatePicker value={d.existingInternetExpiry||''} onChange={v=>u('existingInternetExpiry',v)} /></Field>
           </Row>
-          <Field label="Provider" tight><Input value={d.fibreProvider||''} onChange={v=>u('fibreProvider',v)} placeholder="Provider name" /></Field>
+          <Divider label="Connection Authentication" />
+          <Field label="Does this connection use DHCP?" tight hint="Most connections use DHCP automatically. Select No if the ISP requires PPPoE login or a fixed IP.">
+            <div style={{display:'flex',gap:8}}>
+              {[{v:'yes',l:'Yes — DHCP (automatic)'},{v:'no',l:'No — manual config required'}].map(o=>{
+                const a=(d.existingDHCP||'yes')===o.v;
+                return <button key={o.v} onClick={()=>u('existingDHCP',o.v)} style={{flex:1,padding:'9px',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',border:`2px solid ${a?C.orange:C.border}`,background:a?C.orangeLight:C.surfaceHi,color:a?C.orange:C.textSecondary}}>{o.l}</button>;
+              })}
+            </div>
+          </Field>
+          {(d.existingDHCP||'yes')==='no' && (
+            <>
+              <Field label="Authentication Type" tight>
+                <div style={{display:'flex',gap:8}}>
+                  {[{v:'pppoe',l:'PPPoE'},{v:'fixedip',l:'Fixed IP'}].map(o=>{
+                    const a=d.existingAuthType===o.v;
+                    return <button key={o.v} onClick={()=>u('existingAuthType',o.v)} style={{flex:1,padding:'9px',borderRadius:8,fontSize:13,fontWeight:600,cursor:'pointer',border:`2px solid ${a?C.orange:C.border}`,background:a?C.orangeLight:C.surfaceHi,color:a?C.orange:C.textSecondary}}>{o.l}</button>;
+                  })}
+                </div>
+              </Field>
+              {d.existingAuthType==='pppoe' && (
+                <div style={{padding:'12px 14px',background:'rgba(0,0,0,.2)',borderRadius:9,border:`1px solid ${C.border}`,marginBottom:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>PPPoE Credentials</div>
+                  <Row>
+                    <Field label="PPPoE Username" tight><Input value={d.pppoeUsername||''} onChange={v=>u('pppoeUsername',v)} placeholder="e.g. user@isp.net.au" /></Field>
+                    <Field label="PPPoE Password" tight><Input value={d.pppoePassword||''} onChange={v=>u('pppoePassword',v)} placeholder="PPPoE password" /></Field>
+                  </Row>
+                </div>
+              )}
+              {d.existingAuthType==='fixedip' && (
+                <div style={{padding:'12px 14px',background:'rgba(0,0,0,.2)',borderRadius:9,border:`1px solid ${C.border}`,marginBottom:8}}>
+                  <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:10}}>Fixed IP Configuration</div>
+                  <Row>
+                    <Field label="IP Address" tight><Input value={d.fixedIP||''} onChange={v=>u('fixedIP',v)} placeholder="e.g. 203.0.113.10" /></Field>
+                    <Field label="Subnet Mask" tight><Input value={d.fixedSubnet||''} onChange={v=>u('fixedSubnet',v)} placeholder="e.g. 255.255.255.0" /></Field>
+                  </Row>
+                  <Row>
+                    <Field label="Default Gateway" tight><Input value={d.fixedGateway||''} onChange={v=>u('fixedGateway',v)} placeholder="e.g. 203.0.113.1" /></Field>
+                    <Field label="DNS Server(s)" tight><Input value={d.fixedDNS||''} onChange={v=>u('fixedDNS',v)} placeholder="e.g. 8.8.8.8, 8.8.4.4" /></Field>
+                  </Row>
+                </div>
+              )}
+            </>
+          )}
+          <Field label="Notes" tight hint="Contract expiry, port forwarding rules, anything else relevant">
+            <Input value={d.existingInternetNotes||''} onChange={v=>u('existingInternetNotes',v)} placeholder="e.g. Contract runs until June 2026, static IP block assigned…" />
+          </Field>
         </div>
       )}
 
       <div style={{ marginTop:14 }}>
         <Toggle checked={!!d.sim4g} onChange={v=>u('sim4g',v)} label="4G Backup SIM (Unlimited Data)" sub="Works with Teltonika failover router. Always recommend for cloud-based practices." />
+        {d.sim4g && !d.failover && (
+          <div style={{display:'flex',alignItems:'flex-start',gap:8,padding:'9px 12px',background:'rgba(245,158,11,.08)',border:'1px solid rgba(245,158,11,.3)',borderRadius:8,marginTop:6,fontSize:12}}>
+            <span>⚠️</span>
+            <span style={{color:'#FDE68A'}}>4G Backup SIM selected but no Teltonika TRB140 router was added in IT Infrastructure — a 4G router is required to use this SIM. Go to Phase 3 → Firewall & 4G Failover to add it.</span>
+          </div>
+        )}
       </div>
 
       <Divider label="VoIP Phone Service" />
@@ -2343,7 +2740,7 @@ Return only the email text, no subject line, no preamble.`;
       // Telecoms
       const telRows = [
         d.nbn&&row('Internet',`Business NBN ${d.nbnTier||''}`),
-        d.internetType&&d.internetType!=='nbn'&&row('Internet',`${d.internetType==='fibre'?'Private Fibre':d.internetType==='leased'?'Leased Line':d.internetType} ${d.fibreSpeed||d.customSpeed||''}${d.fibreProvider?' &#183; '+d.fibreProvider:''}`),
+        d.internetType&&d.internetType!=='nbn'&&row('Internet',`${d.internetType==='fibre'?'Private Fibre':d.internetType==='ee'?'Enterprise Ethernet':d.internetType} ${d.fibreSpeed||d.customSpeed||''}${d.fibreProvider?' &#183; '+d.fibreProvider:''}`),
         d.sim4g&&row('4G Backup SIM','Included'),
         d.voip&&row('VoIP Phone Service',`${d.voipLicences||'?'} licences${d.porting?' &#183; Number porting':''}`),
         ...(d.phoneDevices||[]).map(dev=>row(`${dev.deviceType||'Device'} — ${dev.model==='Other'?dev.modelOther||'Other':dev.model}${dev.location?' ('+dev.location+')':''}`,dev.displayName||dev.extension||'Assigned')),
@@ -2814,55 +3211,68 @@ ${d.risks}`:null,
       {/* Summary sections */}
       {d.q1req !== false && (
         <SumSection title="IT Infrastructure">
-          {(rooms||[]).length>0&&(
-            <div style={{border:`1px solid ${C.border}`,borderRadius:8,overflow:'hidden',marginBottom:8}}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',background:C.navyMid,padding:'6px 10px',gap:8}}>
-                {['Location','Type / Model','Specs','Status'].map(h=><div key={h} style={{fontSize:10,fontWeight:700,color:C.textMuted,textTransform:'uppercase',letterSpacing:'.06em'}}>{h}</div>)}
-              </div>
-              {(rooms||[]).map((r,ri)=>{
-                const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
-                const isExist=r.existingPC&&!r.replacePC, isReplace=r.existingPC&&r.replacePC;
-                const inferA = r.pcCpu?cpuAgeYears(r.pcCpu):null;
-                const age = parseInt(r.pcAge)||inferA||0;
-                const statusColor = isReplace?C.orange:isExist&&age>=5?C.red:isExist&&age>=3?C.amber:C.green;
-                const statusLabel = isReplace?'Replace':isExist&&age>=5?'EOL':isExist&&age>=3?'O/W':'OK';
-                const oldSpecs = [r.pcCpu&&r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@/g,'').replace(/\s+/g,' ').trim(),r.pcRam,r.pcStorage].filter(Boolean).join(' · ');
-                const newSpecs = [r.monitor&&r.monitor!=='No Monitor'&&r.monitor,r.kbMouse&&'KB+Mouse',r.database&&'RAID'].filter(Boolean).join(' · ')||'Standard config';
-                return (
-                  <div key={r.id} style={{borderTop:ri>0?`1px solid ${C.border}`:'none',background:ri%2===0?'transparent':'rgba(255,255,255,.02)'}}>
-                    {/* Standard row */}
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',padding:'8px 10px',gap:8}}>
-                      <div style={{fontSize:13,fontWeight:600,color:C.textPrimary}}>{r.name||'Room'}{r.deviceName&&r.deviceName!==r.name?<span style={{fontWeight:400,color:C.textMuted,fontSize:11}}> · {r.deviceName}</span>:''}</div>
-                      <div style={{fontSize:12}}>
-                        {isExist&&!isReplace&&<span style={{color:'#94A3B8'}}>{r.pcBrand||'Existing PC'}</span>}
-                        {isReplace&&<span style={{color:C.red,textDecoration:'line-through',fontSize:11}}>{r.pcBrand||'Existing PC'}</span>}
-                        {!isExist&&!isReplace&&<span style={{color:C.green,fontWeight:600}}>{dev.label}{n(r.qty)>1?` ×${r.qty}`:''}</span>}
-                      </div>
-                      <div style={{fontSize:11,color:'#94A3B8',lineHeight:1.5}}>
-                        {isExist||isReplace ? oldSpecs||'—' : newSpecs}
-                      </div>
-                      <div style={{display:'flex',alignItems:'center'}}>
-                        {isExist&&!isReplace&&<span style={{fontSize:11,fontWeight:700,color:statusColor,background:`${statusColor}22`,padding:'2px 8px',borderRadius:20}}>{statusLabel}</span>}
-                        {isReplace&&<span style={{fontSize:11,fontWeight:700,color:C.orange,background:`${C.orange}22`,padding:'2px 8px',borderRadius:20}}>Replace</span>}
-                        {!isExist&&!isReplace&&<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(16,185,129,.15)',padding:'2px 8px',borderRadius:20}}>NEW</span>}
-                      </div>
-                    </div>
-                    {/* Replacement new device row */}
-                    {isReplace&&(
-                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',padding:'4px 10px 8px',gap:8,background:'rgba(16,185,129,.04)'}}>
-                        <div style={{fontSize:11,color:C.textMuted}}></div>
-                        <div style={{fontSize:12,color:C.green,fontWeight:600}}>→ {dev.label}</div>
-                        <div style={{fontSize:11,color:C.green,lineHeight:1.5}}>{newSpecs}</div>
-                        <div style={{display:'flex',alignItems:'center'}}>
-                          <span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(16,185,129,.15)',padding:'2px 8px',borderRadius:20}}>NEW</span>
-                        </div>
-                      </div>
-                    )}
+          {(rooms||[]).length>0&&(()=>{
+            const getCategory = r => {
+              if(r.pcCategory) return r.pcCategory;
+              if(r.pcOs&&r.pcOs.toLowerCase().includes('server')) return 'Server';
+              if(r.deviceType&&(r.deviceType.includes('laptop')||r.deviceType.includes('il-'))) return 'Laptop';
+              return 'Desktop';
+            };
+            const deviceTable = (label, rows) => rows.length===0 ? null : (
+              <div style={{marginBottom:10}}>
+                <div style={{fontSize:11,fontWeight:700,color:C.textSecondary,textTransform:'uppercase',letterSpacing:'.06em',padding:'4px 10px',background:C.surfaceHi,borderRadius:'6px 6px 0 0'}}>{label}</div>
+                <div style={{border:`1px solid ${C.border}`,borderTop:'none',borderRadius:'0 0 8px 8px',overflow:'hidden'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',background:C.navyMid,padding:'6px 10px',gap:8}}>
+                    {['Location','Type / Model','Specs','Status'].map(h=><div key={h} style={{fontSize:10,fontWeight:700,color:C.textMuted,textTransform:'uppercase',letterSpacing:'.06em'}}>{h}</div>)}
                   </div>
-                );
-              })}
-            </div>
-          )}
+                  {rows.map((r,ri)=>{
+                    const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
+                    const isExist=r.existingPC&&!r.replacePC, isReplace=r.existingPC&&r.replacePC;
+                    const inferA = r.pcCpu?cpuAgeYears(r.pcCpu):null;
+                    const age = parseInt(r.pcAge)||inferA||0;
+                    const statusColor = isReplace?C.orange:isExist&&age>=5?C.red:isExist&&age>=3?C.amber:C.green;
+                    const statusLabel = isReplace?'Replace':isExist&&age>=5?'EOL':isExist&&age>=3?'O/W':'OK';
+                    const oldSpecs = [r.pcCpu&&r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@/g,'').replace(/\s+/g,' ').trim(),r.pcRam,r.pcStorage,r.pcOs,r.pcHasGpu&&(r.pcGpuModel||'GPU'),r.pcSerial&&`S/N: ${r.pcSerial}`].filter(Boolean).join(' · ');
+                    const newSpecs = [r.monitor&&r.monitor!=='No Monitor'&&r.monitor,r.kbMouse&&'KB+Mouse',r.database&&'RAID'].filter(Boolean).join(' · ')||'Standard config';
+                    return (
+                      <div key={r.id} style={{borderTop:ri>0?`1px solid ${C.border}`:'none',background:ri%2===0?'transparent':'rgba(255,255,255,.02)'}}>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',padding:'8px 10px',gap:8}}>
+                          <div style={{fontSize:13,fontWeight:600,color:C.textPrimary}}>{r.name||'Room'}{r.deviceName&&r.deviceName!==r.name?<span style={{fontWeight:400,color:C.textMuted,fontSize:11}}> · {r.deviceName}</span>:''}</div>
+                          <div style={{fontSize:12}}>
+                            {isExist&&!isReplace&&<span style={{color:'#94A3B8'}}>{r.pcBrand||'Existing PC'}</span>}
+                            {isReplace&&<span style={{color:C.red,textDecoration:'line-through',fontSize:11}}>{r.pcBrand||'Existing PC'}</span>}
+                            {!isExist&&!isReplace&&<span style={{color:C.green,fontWeight:600}}>{dev.label}{n(r.qty)>1?` ×${r.qty}`:''}</span>}
+                          </div>
+                          <div style={{fontSize:11,color:'#94A3B8',lineHeight:1.5}}>{isExist||isReplace?oldSpecs||'—':newSpecs}</div>
+                          <div style={{display:'flex',alignItems:'center'}}>
+                            {isExist&&!isReplace&&<span style={{fontSize:11,fontWeight:700,color:statusColor,background:`${statusColor}22`,padding:'2px 8px',borderRadius:20}}>{statusLabel}</span>}
+                            {isReplace&&<span style={{fontSize:11,fontWeight:700,color:C.orange,background:`${C.orange}22`,padding:'2px 8px',borderRadius:20}}>Replace</span>}
+                            {!isExist&&!isReplace&&<span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(16,185,129,.15)',padding:'2px 8px',borderRadius:20}}>NEW</span>}
+                          </div>
+                        </div>
+                        {isReplace&&(
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',padding:'4px 10px 8px',gap:8,background:'rgba(16,185,129,.04)'}}>
+                            <div/>
+                            <div style={{fontSize:12,color:C.green,fontWeight:600}}>→ {dev.label}</div>
+                            <div style={{fontSize:11,color:C.green,lineHeight:1.5}}>{newSpecs}</div>
+                            <div style={{display:'flex',alignItems:'center'}}><span style={{fontSize:11,fontWeight:700,color:C.green,background:'rgba(16,185,129,.15)',padding:'2px 8px',borderRadius:20}}>NEW</span></div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+            const desktops = (rooms||[]).filter(r=>getCategory(r)==='Desktop');
+            const laptops  = (rooms||[]).filter(r=>getCategory(r)==='Laptop');
+            const servers  = (rooms||[]).filter(r=>getCategory(r)==='Server');
+            return (<>
+              {deviceTable('Desktop Computers', desktops)}
+              {deviceTable('Laptops', laptops)}
+              {deviceTable('Servers', servers)}
+            </>);
+          })()}
           <SumRow label="Switch" value={d.switchType||null} />
           <SumRow label="Wi-Fi" value={d.wifiAPs?`${d.wifiAPs}× UniFi U7 Pro${d.apMount?` (${d.apMount}${d.apMount==='Not mounted'?` — ${d.apMountNotes||'location TBC'}`:' mount'})`:''}`
 :null} />
@@ -3155,13 +3565,13 @@ const INIT = {
   rooms:[],
   switchType:'', wifiAPs:'', apMount:'', floorPlanImage:null,
   cameras:false, cameraCount:'', nvrStorage:'',
-  firewall:true, failover:true,
+  firewall:false, failover:false,
   m365Premium:'', m365F1:'',
   installHours:'', spSetup:false, emailMigration:false,
   infraNotes:'', server:'cloud',
   // Imaging — now arrays for multiple devices
   intraoralScanners:[], xrayMachines:[], otherImaging:[],
-  nbn:true, nbnTier:'', tenancy:'', sim4g:true,
+  nbn:true, nbnTier:'', tenancy:'', sim4g:false,
   voip:false, voipLicences:'', ddiLines:'', porting:false,
   handsets: HANDSET_MODELS.map(m=>({ model:m, qty:'', notes:'' })),
   headsets: HEADSET_MODELS.map(m=>({ model:m, qty:'', notes:'' })),
