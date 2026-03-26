@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 
 // ── Brand ─────────────────────────────────────────────────────────────────────
 const C = {
