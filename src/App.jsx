@@ -897,6 +897,15 @@ const Phase3 = ({ d, u }) => {
     setImportCompany(''); setImportAllRows([]); setImportSearch('');
   };
 
+  const getCategory = r => {
+    if(r.pcCategory) return r.pcCategory;
+    if(r.pcOs&&r.pcOs.toLowerCase().includes('server')) return 'Server';
+    if(r.deviceType&&(r.deviceType.includes('laptop')||r.deviceType.includes('il-'))) return 'Laptop';
+    return 'Desktop';
+  };
+  const deviceFilters = ['All','Desktop','Laptop','Server'];
+  const filteredRooms = deviceFilter==='All' ? rooms : rooms.filter(r=>getCategory(r)===deviceFilter);
+
   return (
     <div>
       {/* ScreenConnect Import Modal */}
@@ -1011,280 +1020,262 @@ const Phase3 = ({ d, u }) => {
       )}
 
       {/* Room cards */}
-      {(()=>{
-        const getCategory = r => {
-          if(r.pcCategory) return r.pcCategory;
-          if(r.pcOs&&r.pcOs.toLowerCase().includes('server')) return 'Server';
-          if(r.deviceType&&(r.deviceType.includes('laptop')||r.deviceType.includes('il-'))) return 'Laptop';
-          return 'Desktop';
-        };
-        const filters = ['All','Desktop','Laptop','Server'];
-        const filtered = rooms.filter(r => deviceFilter==='All' || getCategory(r)===deviceFilter);
-        return (<>
-          {rooms.length>0&&(
-            <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
-              <div style={{display:'flex',gap:4}}>
-                {filters.map(f=>{
-                  const count = f==='All' ? rooms.length : rooms.filter(r=>getCategory(r)===f).length;
-                  const active = deviceFilter===f;
-                  return (
-                    <button key={f} onClick={()=>setDeviceFilter(f)}
-                      style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${active?C.orange:C.border}`,background:active?C.orangeLight:'transparent',color:active?C.orange:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>
-                      {f}{count>0&&f!=='All'?` (${count})`:f==='All'?` (${count})`:''}
-                    </button>
-                  );
-                })}
+      <>
+        {rooms.length>0&&(
+          <div style={{display:'flex',gap:8,marginBottom:12,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{display:'flex',gap:4}}>
+              {deviceFilters.map(f=>{
+                const count = f==='All' ? rooms.length : rooms.filter(r=>getCategory(r)===f).length;
+                const active = deviceFilter===f;
+                return (
+                  <button key={f} onClick={()=>setDeviceFilter(f)}
+                    style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${active?C.orange:C.border}`,background:active?C.orangeLight:'transparent',color:active?C.orange:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>
+                    {f}{count>0&&f!=='All'?` (${count})`:f==='All'?` (${count})`:''}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={{marginLeft:'auto',display:'flex',gap:8}}>
+              <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:true})))} style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊟ Collapse All</button>
+              <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊞ Expand All</button>
+            </div>
+          </div>
+        )}
+        {rooms.length===0&&<div style={{ textAlign:'center', padding:'28px 0', color:C.textMuted, fontSize:14 }}>No rooms yet. Start with reception.</div>}
+        {filteredRooms.map((r,i)=>{
+      const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
+      const inferredAgeC = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
+      const ageC = parseInt(r.pcAge)||inferredAgeC||0;
+      const cardBorderColor = r.existingPC && (r.replacePC || ageC>=5) ? C.red
+        : r.existingPC && (ageC>=3 || (r.pcOs && !r.pcOs.includes('Windows 11') && !r.pcOs.includes('Server') && !r.pcOs.includes('macOS') && r.pcOs) || (r.pcOs && r.pcOs.includes('Server 2016'))) ? C.amber
+        : dev.imaging ? C.orangeBorder : C.gray200;
+      return (
+        <Card key={r.id} style={{ borderColor: cardBorderColor }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:r.collapsed?0:14 }}>
+            <div style={{flex:1,cursor:'pointer'}} onClick={()=>updR(r.id,'collapsed',!r.collapsed)}>
+              <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{color:C.textMuted,fontSize:12}}>{r.collapsed?'▶':'▼'}</span>
+                <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:15, color:C.textPrimary }}>{r.name||`Room ${i+1}`}{r.deviceName?<span style={{fontWeight:400,color:C.textSecondary,fontSize:13}}> · {r.deviceName}</span>:''}</div>
               </div>
-              <div style={{marginLeft:'auto',display:'flex',gap:8}}>
-                <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:true})))} style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊟ Collapse All</button>
-                <button onClick={()=>u('rooms',rooms.map(r=>({...r,collapsed:false})))} style={{padding:'5px 12px',borderRadius:8,border:`1.5px solid ${C.border}`,background:'transparent',color:C.textSecondary,fontWeight:600,fontSize:12,cursor:'pointer'}}>⊞ Expand All</button>
+              {r.collapsed && <div style={{ marginTop:4, marginLeft:20 }}>
+                {r.existingPC
+                  ? <>
+                      <Pill label={r.pcHasGpu?'GPU Workstation':r.pcOs&&r.pcOs.toLowerCase().includes('server')?'Server':'Desktop PC'} color={C.navyMid} />
+                      {r.pcBrand&&<Pill label={r.pcBrand} color={C.gray600} />}
+                      {r.pcCpu&&<Pill label={r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@\s*[\d.]+\s*GHz/gi,'').replace(/\s+/g,' ').trim()} color={C.gray600} />}
+                      {r.pcRam&&<Pill label={r.pcRam} color={C.gray600} />}
+                      {r.pcStorage&&<Pill label={r.pcStorage} color={C.gray600} />}
+                      {r.pcOs&&<Pill label={r.pcOs} color={r.pcOs.includes('Windows 11')||r.pcOs==='macOS'?C.navyMid:r.pcOs.includes('Server 2022')||r.pcOs.includes('Server 2019')?C.navyMid:r.pcOs.includes('Server')?C.amber:C.red} />}
+                      {r.pcHasGpu&&r.pcGpuModel&&<Pill label={r.pcGpuModel} color={C.amber} />}
+                      {r.pcSerial&&<Pill label={`S/N: ${r.pcSerial}`} color={C.gray600} />}
+                      {r.replacePC&&<Pill label="Replace" color={C.orange} />}
+                    </>
+                  : <>
+                      <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
+                      {dev.gpu&&dev.gpu!=='None'&&<Pill label={dev.gpu} color={C.amber} />}
+                      {r.monitor&&r.monitor!=='No Monitor'&&<Pill label={r.monitor} color={C.navyMid} />}
+                      {r.kbMouse&&<Pill label="KB+Mouse" color={C.navyMid} />}
+                      {r.database&&<Pill label="RAID" color={C.amber} />}
+                    </>
+                }
+              </div>}
+              {!r.collapsed && <div style={{ marginTop:4 }}>
+                {r.existingPC
+                  ? <>
+                      <Pill label={r.pcHasGpu?'GPU Workstation':r.pcOs&&r.pcOs.toLowerCase().includes('server')?'Server':'Desktop PC'} color={C.navyMid} />
+                      {r.pcBrand&&<Pill label={r.pcBrand} color={C.gray600} />}
+                      {r.pcCpu&&<Pill label={r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@\s*[\d.]+\s*GHz/gi,'').replace(/\s+/g,' ').trim()} color={C.gray600} />}
+                      {r.pcRam&&<Pill label={r.pcRam} color={C.gray600} />}
+                      {r.pcStorage&&<Pill label={r.pcStorage} color={C.gray600} />}
+                      {r.pcOs&&<Pill label={r.pcOs} color={r.pcOs.includes('Windows 11')||r.pcOs==='macOS'?C.navyMid:r.pcOs.includes('Server 2022')||r.pcOs.includes('Server 2019')?C.navyMid:r.pcOs.includes('Server')?C.amber:C.red} />}
+                      {r.pcHasGpu&&r.pcGpuModel&&<Pill label={r.pcGpuModel} color={C.amber} />}
+                      {r.database&&<Pill label="RAID" color={C.amber} />}
+                    </>
+                  : <>
+                      <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
+                      {dev.gpu&&dev.gpu!=='None'&&<Pill label={dev.gpu} color={C.amber} />}
+                      {r.database&&<Pill label="RAID Storage" color={C.amber} />}
+                      {r.monitor&&r.monitor!=='No Monitor'&&<Pill label={r.monitor} color={C.navyMid} />}
+                      {r.kbMouse&&<Pill label="KB+Mouse" color={C.navyMid} />}
+                    </>
+                }
+              </div>}
+            </div>
+            <button onClick={()=>delR(r.id)} style={{ fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
+          </div>
+          {!r.collapsed && <>
+          <Row cols={r.existingPC?2:3}>
+            <Field label="Room / Location Name" tight><Input value={r.name} onChange={v=>updR(r.id,'name',v)} placeholder="e.g. Treatment Room 1, Reception…" /></Field>
+            <Field label="Device Name" tight hint="Hostname / PC name"><Input value={r.deviceName||''} onChange={v=>updR(r.id,'deviceName',v)} placeholder="e.g. SURGERY1-PC, REC-01" /></Field>
+            {!r.existingPC && <Field label="Qty" tight><Num value={r.qty} onChange={v=>updR(r.id,'qty',v)} min={1} /></Field>}
+          </Row>
+
+          {/* Existing PC toggle — if on, hide device/monitor/peripherals */}
+          <div style={{ marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}` }}>
+            <Toggle checked={!!r.existingPC} onChange={v=>updR(r.id,'existingPC',v)}
+              label="Existing computer in this room"
+              sub={r.existingPC?'Device specs captured below — no new device or install required':'New computer will be supplied by 32 Byte'} />
+          </div>
+
+          {/* Existing PC details — shown when existingPC is on */}
+          {r.existingPC && (()=>{
+            const inferredAge = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
+            const age = parseInt(r.pcAge) || inferredAge || 0;
+            const ageBorder = age>=5 ? C.red : age>=3 ? C.amber : C.border;
+            const ageBg = age>=5 ? 'rgba(239,68,68,.08)' : age>=3 ? 'rgba(245,158,11,.08)' : C.surfaceHi;
+            return (
+              <div style={{ padding:'14px 16px', background:ageBg, borderRadius:9, border:`1.5px solid ${ageBorder}`, marginBottom:8 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:12 }}>Existing Computer Details</div>
+                <Row>
+                  <Field label="Brand / Model" tight><Input value={r.pcBrand||''} onChange={v=>updR(r.id,'pcBrand',v)} placeholder="e.g. Dell OptiPlex, HP EliteDesk…" /></Field>
+                  <Field label="Age (years)" tight hint={inferredAge&&!r.pcAge?`Auto-detected from CPU: ~${inferredAge} yrs`:'Override if you know the exact age'}>
+                    <Input type="number" value={r.pcAge||''} onChange={v=>updR(r.id,'pcAge',v)} placeholder={inferredAge?`~${inferredAge} (auto)`:'e.g. 3'} />
+                  </Field>
+                </Row>
+                <Row>
+                  <Field label="Device Category" tight hint="Auto-detected — override if needed">
+                    <Select value={r.pcCategory||''} onChange={v=>updR(r.id,'pcCategory',v)}
+                      options={['Desktop','Laptop','Server']}
+                      placeholder={`${r.pcOs&&r.pcOs.toLowerCase().includes('server')?'Server':r.deviceType&&(r.deviceType.includes('laptop')||r.deviceType.includes('il-'))?'Laptop':'Desktop'} (auto-detected)`} />
+                  </Field>
+                </Row>
+                {age>=5 && <InfoBox type="alert">⚠️ Device is ~{age} years old — likely end of life. Consider replacement.</InfoBox>}
+                {age>=3 && age<5 && <InfoBox type="warn">⚠️ Device is ~{age} years old — likely out of manufacturer warranty. Discuss support options.</InfoBox>}
+                <Row>
+                  <Field label="CPU Model" tight><Input value={r.pcCpu||''} onChange={v=>updR(r.id,'pcCpu',v)} placeholder="e.g. Intel Core i7-12700, AMD Ryzen 7 5800X" /></Field>
+                  <Field label="RAM" tight>
+                    <Select value={r.pcRam||''} onChange={v=>updR(r.id,'pcRam',v)} options={['4 GB','8 GB','16 GB','32 GB','64 GB','Other']} placeholder="Select RAM…" />
+                  </Field>
+                </Row>
+                <Row>
+                  <Field label="Storage" tight>
+                    <Select value={r.pcStorage||''} onChange={v=>updR(r.id,'pcStorage',v)} options={['128 GB SSD','256 GB SSD','512 GB SSD','1 TB SSD','2 TB SSD','256 GB HDD','512 GB HDD','1 TB HDD','2 TB HDD','Other']} placeholder="Select storage…" />
+                  </Field>
+                  <Field label="Graphics Card" tight>
+                    <Toggle checked={!!r.pcHasGpu} onChange={v=>updR(r.id,'pcHasGpu',v)} label={r.pcHasGpu?'Yes — GPU present':'No dedicated GPU'} />
+                  </Field>
+                </Row>
+                {r.pcHasGpu && <Field label="GPU Model" tight><Input value={r.pcGpuModel||''} onChange={v=>updR(r.id,'pcGpuModel',v)} placeholder="e.g. NVIDIA RTX A1000, Quadro P2000" /></Field>}
+                <Field label="Serial Number" tight hint="From BIOS / label on chassis">
+                  <Input value={r.pcSerial||''} onChange={v=>updR(r.id,'pcSerial',v)} placeholder="e.g. F2XKLN2" />
+                </Field>
+                <Field label="Condition" tight>
+                  <div style={{ display:'flex', gap:6 }}>
+                    {['Good','Functional','Poor','Unknown'].map(c=>{
+                      const a=r.pcCondition===c;
+                      return <button key={c} onClick={()=>updR(r.id,'pcCondition',c)} style={{ flex:1, padding:'7px 6px', borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surface, color:a?C.orange:C.textSecondary }}>{c}</button>;
+                    })}
+                  </div>
+                </Field>
+                <Row>
+                  <Field label="Operating System" tight>
+                    <Select value={r.pcOs||''} onChange={v=>updR(r.id,'pcOs',v)}
+                      options={['Windows 11 Pro','Windows 11 Business','Windows 11 Home','Windows 10 Pro','Windows 10 Business','Windows 10 Home','Windows Server 2022','Windows Server 2019','Windows Server 2016','macOS','Other']}
+                      placeholder="Select OS…" />
+                  </Field>
+                  <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="Issues, imaging software, reuse potential…" /></Field>
+                </Row>
+                {r.pcOs && !r.pcOs.includes('Windows 11') && !r.pcOs.includes('Server') && !r.pcOs.includes('macOS') && <InfoBox type="alert">⚠️ {r.pcOs} — not Windows 11. Upgrade or replacement recommended before go-live.</InfoBox>}
+                {r.pcOs && r.pcOs.includes('Server 2016') && <InfoBox type="alert">⚠️ Windows Server 2016 reached end of support in January 2022. Upgrade to Server 2022 recommended.</InfoBox>}
+                <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
+                  <Toggle checked={!!r.replacePC} onChange={v=>updR(r.id,'replacePC',v)}
+                    label="Replace this computer"
+                    sub={r.replacePC?'Select replacement below — existing details kept for handover':'Keep existing computer, no replacement required'} />
+                </div>
               </div>
+            );
+          })()}
+
+          {/* Replacement device options — shown when replacePC is true */}
+          {r.existingPC && r.replacePC && (
+            <div style={{marginTop:10,padding:'14px 16px',background:C.orangeLight,borderRadius:9,border:`1.5px solid ${C.orangeBorder}`,marginBottom:8}}>
+              <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Replacement Device</div>
+              <Field label="Device Type" tight>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {DEVICE_OPTIONS.map(o=>{
+                    const a=r.deviceType===o.v;
+                    return (
+                      <button key={o.v} onClick={()=>updR(r.id,'deviceType',o.v)}
+                        style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 14px', borderRadius:8, border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, cursor:'pointer', textAlign:'left' }}>
+                        <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${a?C.orange:C.gray400}`, background:a?C.orange:'transparent', flexShrink:0 }}/>
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:700, color:a?C.orange:C.textPrimary }}>{o.label}</div>
+                          <div style={{ fontSize:11, color:C.textMuted, marginTop:1 }}>{o.sub}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+              <Row>
+                <Field label="Monitor" tight>
+                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                    {MONITOR_OPTS.map(mo=>{
+                      const a=r.monitor===mo;
+                      return <button key={mo} onClick={()=>updR(r.id,'monitor',mo)} style={{ padding:'8px 12px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary, textAlign:'left' }}>{mo}</button>;
+                    })}
+                  </div>
+                </Field>
+                <Field label="Peripherals" tight>
+                  <div style={{ marginBottom:10 }}>
+                    <Toggle checked={r.kbMouse} onChange={v=>updR(r.id,'kbMouse',v)} label="Wireless Keyboard & Mouse" sub="Logitech MK345" />
+                  </div>
+                  {dev.imaging && (
+                    <Toggle checked={r.database} onChange={v=>updR(r.id,'database',v)} label="RAID Storage Required"
+                      sub={r.database?'2 × NVMe SSD in RAID array — local database':'Cloud-based / no local DB'} />
+                  )}
+                </Field>
+              </Row>
             </div>
           )}
-          {rooms.length===0&&<div style={{ textAlign:'center', padding:'28px 0', color:C.textMuted, fontSize:14 }}>No rooms yet. Start with reception.</div>}
-          {filtered.map((r,i)=>{
-        const dev=DEVICE_OPTIONS.find(o=>o.v===r.deviceType)||DEVICE_OPTIONS[5];
-        const inferredAgeC = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
-        const ageC = parseInt(r.pcAge)||inferredAgeC||0;
-        const cardBorderColor = r.existingPC && (r.replacePC || ageC>=5) ? C.red
-          : r.existingPC && (ageC>=3 || (r.pcOs && !r.pcOs.includes('Windows 11') && !r.pcOs.includes('Server') && !r.pcOs.includes('macOS') && r.pcOs) || (r.pcOs && r.pcOs.includes('Server 2016'))) ? C.amber
-          : dev.imaging ? C.orangeBorder : C.gray200;
-        return (
-          <Card key={r.id} style={{ borderColor: cardBorderColor }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:r.collapsed?0:14 }}>
-              <div style={{flex:1,cursor:'pointer'}} onClick={()=>updR(r.id,'collapsed',!r.collapsed)}>
-                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                  <span style={{color:C.textMuted,fontSize:12}}>{r.collapsed?'▶':'▼'}</span>
-                  <div style={{ fontFamily:'Sora,sans-serif', fontWeight:700, fontSize:15, color:C.textPrimary }}>{r.name||`Room ${i+1}`}{r.deviceName?<span style={{fontWeight:400,color:C.textSecondary,fontSize:13}}> · {r.deviceName}</span>:''}</div>
+
+          {/* New device options — shown when no existing PC */}
+          {!r.existingPC && (
+            <>
+              <Field label="Device Type" tight>
+                <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                  {DEVICE_OPTIONS.map(o=>{
+                    const a=r.deviceType===o.v;
+                    return (
+                      <button key={o.v} onClick={()=>updR(r.id,'deviceType',o.v)}
+                        style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 14px', borderRadius:8, border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, cursor:'pointer', textAlign:'left' }}>
+                        <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${a?C.orange:C.gray400}`, background:a?C.orange:'transparent', flexShrink:0 }}/>
+                        <div>
+                          <div style={{ fontSize:13, fontWeight:700, color:a?C.orange:C.textPrimary }}>{o.label}</div>
+                          <div style={{ fontSize:11, color:C.textMuted, marginTop:1 }}>{o.sub}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-                {r.collapsed && <div style={{ marginTop:4, marginLeft:20 }}>
-                  {r.existingPC
-                    ? <>
-                        <Pill label={r.pcHasGpu?'GPU Workstation':r.pcOs&&r.pcOs.toLowerCase().includes('server')?'Server':'Desktop PC'} color={C.navyMid} />
-                        {r.pcBrand&&<Pill label={r.pcBrand} color={C.gray600} />}
-                        {r.pcCpu&&<Pill label={r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@\s*[\d.]+\s*GHz/gi,'').replace(/\s+/g,' ').trim()} color={C.gray600} />}
-                        {r.pcRam&&<Pill label={r.pcRam} color={C.gray600} />}
-                        {r.pcStorage&&<Pill label={r.pcStorage} color={C.gray600} />}
-                        {r.pcOs&&<Pill label={r.pcOs} color={r.pcOs.includes('Windows 11')||r.pcOs==='macOS'?C.navyMid:r.pcOs.includes('Server 2022')||r.pcOs.includes('Server 2019')?C.navyMid:r.pcOs.includes('Server')?C.amber:C.red} />}
-                        {r.pcHasGpu&&r.pcGpuModel&&<Pill label={r.pcGpuModel} color={C.amber} />}
-                        {r.pcSerial&&<Pill label={`S/N: ${r.pcSerial}`} color={C.gray600} />}
-                        {r.replacePC&&<Pill label="Replace" color={C.orange} />}
-                      </>
-                    : <>
-                        <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
-                        {dev.gpu&&dev.gpu!=='None'&&<Pill label={dev.gpu} color={C.amber} />}
-                        {r.monitor&&r.monitor!=='No Monitor'&&<Pill label={r.monitor} color={C.navyMid} />}
-                        {r.kbMouse&&<Pill label="KB+Mouse" color={C.navyMid} />}
-                        {r.database&&<Pill label="RAID" color={C.amber} />}
-                      </>
-                  }
-                </div>}
-                {!r.collapsed && <div style={{ marginTop:4 }}>
-                  {r.existingPC
-                    ? <>
-                        <Pill label={r.pcHasGpu?'GPU Workstation':r.pcOs&&r.pcOs.toLowerCase().includes('server')?'Server':'Desktop PC'} color={C.navyMid} />
-                        {r.pcBrand&&<Pill label={r.pcBrand} color={C.gray600} />}
-                        {r.pcCpu&&<Pill label={r.pcCpu.replace(/Intel\(R\)|Core\(TM\)|@\s*[\d.]+\s*GHz/gi,'').replace(/\s+/g,' ').trim()} color={C.gray600} />}
-                        {r.pcRam&&<Pill label={r.pcRam} color={C.gray600} />}
-                        {r.pcStorage&&<Pill label={r.pcStorage} color={C.gray600} />}
-                        {r.pcOs&&<Pill label={r.pcOs} color={r.pcOs.includes('Windows 11')||r.pcOs==='macOS'?C.navyMid:r.pcOs.includes('Server 2022')||r.pcOs.includes('Server 2019')?C.navyMid:r.pcOs.includes('Server')?C.amber:C.red} />}
-                        {r.pcHasGpu&&r.pcGpuModel&&<Pill label={r.pcGpuModel} color={C.amber} />}
-                        {r.database&&<Pill label="RAID" color={C.amber} />}
-                      </>
-                    : <>
-                        <Pill label={dev.label} color={dev.imaging?C.orange:C.navyMid} />
-                        {dev.gpu&&dev.gpu!=='None'&&<Pill label={dev.gpu} color={C.amber} />}
-                        {r.database&&<Pill label="RAID Storage" color={C.amber} />}
-                        {r.monitor&&r.monitor!=='No Monitor'&&<Pill label={r.monitor} color={C.navyMid} />}
-                        {r.kbMouse&&<Pill label="KB+Mouse" color={C.navyMid} />}
-                      </>
-                  }
-                </div>}
-              </div>
-              <button onClick={()=>delR(r.id)} style={{ fontSize:12, color:C.red, background:'none', border:'none', cursor:'pointer', fontWeight:600 }}>Remove</button>
-            </div>
-            {!r.collapsed && <>
-            <Row cols={r.existingPC?2:3}>
-              <Field label="Room / Location Name" tight><Input value={r.name} onChange={v=>updR(r.id,'name',v)} placeholder="e.g. Treatment Room 1, Reception…" /></Field>
-              <Field label="Device Name" tight hint="Hostname / PC name"><Input value={r.deviceName||''} onChange={v=>updR(r.id,'deviceName',v)} placeholder="e.g. SURGERY1-PC, REC-01" /></Field>
-              {!r.existingPC && <Field label="Qty" tight><Num value={r.qty} onChange={v=>updR(r.id,'qty',v)} min={1} /></Field>}
-            </Row>
-
-            {/* Existing PC toggle — if on, hide device/monitor/peripherals */}
-            <div style={{ marginBottom:12, paddingBottom:12, borderBottom:`1px solid ${C.border}` }}>
-              <Toggle checked={!!r.existingPC} onChange={v=>updR(r.id,'existingPC',v)}
-                label="Existing computer in this room"
-                sub={r.existingPC?'Device specs captured below — no new device or install required':'New computer will be supplied by 32 Byte'} />
-            </div>
-
-            {/* Existing PC details — shown when existingPC is on */}
-            {r.existingPC && (()=>{
-              const inferredAge = r.pcCpu ? cpuAgeYears(r.pcCpu) : null;
-              const age = parseInt(r.pcAge) || inferredAge || 0;
-              const ageBorder = age>=5 ? C.red : age>=3 ? C.amber : C.border;
-              const ageBg = age>=5 ? 'rgba(239,68,68,.08)' : age>=3 ? 'rgba(245,158,11,.08)' : C.surfaceHi;
-              return (
-                <div style={{ padding:'14px 16px', background:ageBg, borderRadius:9, border:`1.5px solid ${ageBorder}`, marginBottom:8 }}>
-                  <div style={{ fontSize:11, fontWeight:700, color:C.orange, textTransform:'uppercase', letterSpacing:'.06em', marginBottom:12 }}>Existing Computer Details</div>
-                  <Row>
-                    <Field label="Brand / Model" tight><Input value={r.pcBrand||''} onChange={v=>updR(r.id,'pcBrand',v)} placeholder="e.g. Dell OptiPlex, HP EliteDesk…" /></Field>
-                    <Field label="Age (years)" tight hint={inferredAge&&!r.pcAge?`Auto-detected from CPU: ~${inferredAge} yrs`:'Override if you know the exact age'}>
-                      <Input type="number" value={r.pcAge||''} onChange={v=>updR(r.id,'pcAge',v)} placeholder={inferredAge?`~${inferredAge} (auto)`:'e.g. 3'} />
-                    </Field>
-                  </Row>
-                  <Row>
-                    <Field label="Device Category" tight hint="Auto-detected — override if needed">
-                      {(()=>{
-                        const autoCategory = r.pcOs&&r.pcOs.toLowerCase().includes('server') ? 'Server'
-                          : (r.deviceType&&(r.deviceType.includes('laptop')||r.deviceType.includes('il-'))) ? 'Laptop'
-                          : 'Desktop';
-                        const effective = r.pcCategory || autoCategory;
-                        return (
-                          <Select value={r.pcCategory||''} onChange={v=>updR(r.id,'pcCategory',v)}
-                            options={['Desktop','Laptop','Server']}
-                            placeholder={`${autoCategory} (auto-detected)`} />
-                        );
-                      })()}
-                    </Field>
-                  </Row>
-                  {age>=5 && <InfoBox type="alert">⚠️ Device is ~{age} years old — likely end of life. Consider replacement.</InfoBox>}
-                  {age>=3 && age<5 && <InfoBox type="warn">⚠️ Device is ~{age} years old — likely out of manufacturer warranty. Discuss support options.</InfoBox>}
-                  <Row>
-                    <Field label="CPU Model" tight><Input value={r.pcCpu||''} onChange={v=>updR(r.id,'pcCpu',v)} placeholder="e.g. Intel Core i7-12700, AMD Ryzen 7 5800X" /></Field>
-                    <Field label="RAM" tight>
-                      <Select value={r.pcRam||''} onChange={v=>updR(r.id,'pcRam',v)} options={['4 GB','8 GB','16 GB','32 GB','64 GB','Other']} placeholder="Select RAM…" />
-                    </Field>
-                  </Row>
-                  <Row>
-                    <Field label="Storage" tight>
-                      <Select value={r.pcStorage||''} onChange={v=>updR(r.id,'pcStorage',v)} options={['128 GB SSD','256 GB SSD','512 GB SSD','1 TB SSD','2 TB SSD','256 GB HDD','512 GB HDD','1 TB HDD','2 TB HDD','Other']} placeholder="Select storage…" />
-                    </Field>
-                    <Field label="Graphics Card" tight>
-                      <Toggle checked={!!r.pcHasGpu} onChange={v=>updR(r.id,'pcHasGpu',v)} label={r.pcHasGpu?'Yes — GPU present':'No dedicated GPU'} />
-                    </Field>
-                  </Row>
-                  {r.pcHasGpu && <Field label="GPU Model" tight><Input value={r.pcGpuModel||''} onChange={v=>updR(r.id,'pcGpuModel',v)} placeholder="e.g. NVIDIA RTX A1000, Quadro P2000" /></Field>}
-                  <Field label="Serial Number" tight hint="From BIOS / label on chassis">
-                    <Input value={r.pcSerial||''} onChange={v=>updR(r.id,'pcSerial',v)} placeholder="e.g. F2XKLN2" />
-                  </Field>
-                  <Field label="Condition" tight>
-                    <div style={{ display:'flex', gap:6 }}>
-                      {['Good','Functional','Poor','Unknown'].map(c=>{
-                        const a=r.pcCondition===c;
-                        return <button key={c} onClick={()=>updR(r.id,'pcCondition',c)} style={{ flex:1, padding:'7px 6px', borderRadius:7, fontSize:12, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.border}`, background:a?C.orangeLight:C.surface, color:a?C.orange:C.textSecondary }}>{c}</button>;
-                      })}
-                    </div>
-                  </Field>
-                  <Row>
-                    <Field label="Operating System" tight>
-                      <Select value={r.pcOs||''} onChange={v=>updR(r.id,'pcOs',v)}
-                        options={['Windows 11 Pro','Windows 11 Business','Windows 11 Home','Windows 10 Pro','Windows 10 Business','Windows 10 Home','Windows Server 2022','Windows Server 2019','Windows Server 2016','macOS','Other']}
-                        placeholder="Select OS…" />
-                    </Field>
-                    <Field label="Notes" tight><Input value={r.pcNotes||''} onChange={v=>updR(r.id,'pcNotes',v)} placeholder="Issues, imaging software, reuse potential…" /></Field>
-                  </Row>
-                  {r.pcOs && !r.pcOs.includes('Windows 11') && !r.pcOs.includes('Server') && !r.pcOs.includes('macOS') && <InfoBox type="alert">⚠️ {r.pcOs} — not Windows 11. Upgrade or replacement recommended before go-live.</InfoBox>}
-                  {r.pcOs && r.pcOs.includes('Server 2016') && <InfoBox type="alert">⚠️ Windows Server 2016 reached end of support in January 2022. Upgrade to Server 2022 recommended.</InfoBox>}
-                  <div style={{marginTop:12,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
-                    <Toggle checked={!!r.replacePC} onChange={v=>updR(r.id,'replacePC',v)}
-                      label="Replace this computer"
-                      sub={r.replacePC?'Select replacement below — existing details kept for handover':'Keep existing computer, no replacement required'} />
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* Replacement device options — shown when replacePC is true */}
-            {r.existingPC && r.replacePC && (
-              <div style={{marginTop:10,padding:'14px 16px',background:C.orangeLight,borderRadius:9,border:`1.5px solid ${C.orangeBorder}`,marginBottom:8}}>
-                <div style={{fontSize:11,fontWeight:700,color:C.orange,textTransform:'uppercase',letterSpacing:'.06em',marginBottom:12}}>Replacement Device</div>
-                <Field label="Device Type" tight>
+              </Field>
+              <Row>
+                <Field label="Monitor" tight>
                   <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                    {DEVICE_OPTIONS.map(o=>{
-                      const a=r.deviceType===o.v;
-                      return (
-                        <button key={o.v} onClick={()=>updR(r.id,'deviceType',o.v)}
-                          style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 14px', borderRadius:8, border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, cursor:'pointer', textAlign:'left' }}>
-                          <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${a?C.orange:C.gray400}`, background:a?C.orange:'transparent', flexShrink:0 }}/>
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:700, color:a?C.orange:C.textPrimary }}>{o.label}</div>
-                            <div style={{ fontSize:11, color:C.textMuted, marginTop:1 }}>{o.sub}</div>
-                          </div>
-                        </button>
-                      );
+                    {MONITOR_OPTS.map(mo=>{
+                      const a=r.monitor===mo;
+                      return <button key={mo} onClick={()=>updR(r.id,'monitor',mo)} style={{ padding:'8px 12px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary, textAlign:'left' }}>{mo}</button>;
                     })}
                   </div>
                 </Field>
-                <Row>
-                  <Field label="Monitor" tight>
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {MONITOR_OPTS.map(mo=>{
-                        const a=r.monitor===mo;
-                        return <button key={mo} onClick={()=>updR(r.id,'monitor',mo)} style={{ padding:'8px 12px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary, textAlign:'left' }}>{mo}</button>;
-                      })}
-                    </div>
-                  </Field>
-                  <Field label="Peripherals" tight>
-                    <div style={{ marginBottom:10 }}>
-                      <Toggle checked={r.kbMouse} onChange={v=>updR(r.id,'kbMouse',v)} label="Wireless Keyboard & Mouse" sub="Logitech MK345" />
-                    </div>
-                    {dev.imaging && (
-                      <Toggle checked={r.database} onChange={v=>updR(r.id,'database',v)} label="RAID Storage Required"
-                        sub={r.database?'2 × NVMe SSD in RAID array — local database':'Cloud-based / no local DB'} />
-                    )}
-                  </Field>
-                </Row>
-              </div>
-            )}
-
-            {/* New device options — shown when no existing PC */}
-            {!r.existingPC && (
-              <>
-                <Field label="Device Type" tight>
-                  <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                    {DEVICE_OPTIONS.map(o=>{
-                      const a=r.deviceType===o.v;
-                      return (
-                        <button key={o.v} onClick={()=>updR(r.id,'deviceType',o.v)}
-                          style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 14px', borderRadius:8, border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, cursor:'pointer', textAlign:'left' }}>
-                          <div style={{ width:14, height:14, borderRadius:'50%', border:`2px solid ${a?C.orange:C.gray400}`, background:a?C.orange:'transparent', flexShrink:0 }}/>
-                          <div>
-                            <div style={{ fontSize:13, fontWeight:700, color:a?C.orange:C.textPrimary }}>{o.label}</div>
-                            <div style={{ fontSize:11, color:C.textMuted, marginTop:1 }}>{o.sub}</div>
-                          </div>
-                        </button>
-                      );
-                    })}
+                <Field label="Peripherals" tight>
+                  <div style={{ marginBottom:10 }}>
+                    <Toggle checked={r.kbMouse} onChange={v=>updR(r.id,'kbMouse',v)} label="Wireless Keyboard & Mouse" sub="Logitech MK345" />
                   </div>
+                  {dev.imaging && (
+                    <Toggle checked={r.database} onChange={v=>updR(r.id,'database',v)} label="RAID Storage Required"
+                      sub={r.database?'2 × NVMe SSD in RAID array — local database':'Cloud-based / no local DB'} />
+                  )}
                 </Field>
-                <Row>
-                  <Field label="Monitor" tight>
-                    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                      {MONITOR_OPTS.map(mo=>{
-                        const a=r.monitor===mo;
-                        return <button key={mo} onClick={()=>updR(r.id,'monitor',mo)} style={{ padding:'8px 12px', borderRadius:8, fontSize:13, fontWeight:600, cursor:'pointer', border:`2px solid ${a?C.orange:C.gray200}`, background:a?C.orangeLight:C.surfaceHi, color:a?C.orange:C.textSecondary, textAlign:'left' }}>{mo}</button>;
-                      })}
-                    </div>
-                  </Field>
-                  <Field label="Peripherals" tight>
-                    <div style={{ marginBottom:10 }}>
-                      <Toggle checked={r.kbMouse} onChange={v=>updR(r.id,'kbMouse',v)} label="Wireless Keyboard & Mouse" sub="Logitech MK345" />
-                    </div>
-                    {dev.imaging && (
-                      <Toggle checked={r.database} onChange={v=>updR(r.id,'database',v)} label="RAID Storage Required"
-                        sub={r.database?'2 × NVMe SSD in RAID array — local database':'Cloud-based / no local DB'} />
-                    )}
-                  </Field>
-                </Row>
-              </>
-            )}
-            <Field label="Notes" tight><Input value={r.notes} onChange={v=>updR(r.id,'notes',v)} placeholder="Imaging software, peripheral devices, special requirements…" /></Field>
-            </>}
-          </Card>
-        );
-      })}
-        </>);
-      })()}
+              </Row>
+            </>
+          )}
+          <Field label="Notes" tight><Input value={r.notes} onChange={v=>updR(r.id,'notes',v)} placeholder="Imaging software, peripheral devices, special requirements…" /></Field>
+          </>}
+        </Card>
+      );
+    })}
+      </>
       <div style={{display:'flex',gap:8,marginBottom:22,flexWrap:'wrap'}}>
         <button onClick={addR} style={{ flex:1, minWidth:120, padding:'12px', borderRadius:10, border:`2px dashed ${C.border}`, background:'transparent', color:C.orange, fontWeight:700, fontSize:14, cursor:'pointer' }}>+ Add Room</button>
         <button onClick={()=>setShowImport(true)} style={{ padding:'12px 14px', borderRadius:10, border:`2px solid ${C.navyMid}`, background:C.navyMid, color:C.white, fontWeight:700, fontSize:13, cursor:'pointer', whiteSpace:'nowrap' }}>⬆ Import</button>
