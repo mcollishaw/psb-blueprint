@@ -615,9 +615,9 @@ const Phase1 = ({ d, u }) => {
 // ── Phase 2 ───────────────────────────────────────────────────────────────────
 const Phase2 = ({ d, u }) => {
   const vendors = d.vendors||[];
-  const [collapsed, setCollapsed] = React.useState({});
-  const [dragIdx,   setDragIdx]   = React.useState(null);
-  const [dragOver,  setDragOver]  = React.useState(null);
+  const [collapsed, setCollapsed] = useState({});
+  const [dragIdx,   setDragIdx]   = useState(null);
+  const [dragOver,  setDragOver]  = useState(null);
 
   const addV  = () => u('vendors',[...vendors,{ id:uid(), type:'', company:'', contact:'', phone:'', email:'', installResp:'TBD', notes:'' }]);
   const updV  = (id,k,v) => u('vendors', vendors.map(x=>x.id===id?{...x,[k]:v}:x));
