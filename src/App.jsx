@@ -2101,7 +2101,7 @@ const Phase4 = ({ d, u }) => {
             <button onClick={addPhone} style={{width:'100%',padding:'10px',borderRadius:9,border:`2px dashed ${C.border}`,background:'transparent',color:C.orange,fontWeight:700,fontSize:13,cursor:'pointer',marginBottom:12}}>
               + Add Phone Device
             </button>
-            {devices.length>0&&(
+            {phoneDevices.length>0&&(
               <div style={{background:C.surface,border:`1.5px solid ${C.border}`,borderRadius:9,padding:'12px 16px',fontSize:13,color:C.textSecondary}}>
                 Phone / headset setup: 2 hrs base + 15 min per handset beyond 4 — included in professional services
               </div>
