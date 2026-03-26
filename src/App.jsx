@@ -1684,9 +1684,38 @@ const Phase3 = ({ d, u }) => {
 };
 
 // ── Phase 4 ───────────────────────────────────────────────────────────────────
+const Node = ({icon,label,sub,color='#1E3869'}) => (
+  <div style={{ background:color, border:'1.5px solid rgba(255,255,255,.15)', borderRadius:9, padding:'10px 14px', textAlign:'center', minWidth:140 }}>
+    <div style={{ fontSize:18, marginBottom:4 }}>{icon}</div>
+    <div style={{ fontSize:12, fontWeight:700, color:C.white, lineHeight:1.3 }}>{label}</div>
+    {sub&&<div style={{ fontSize:10, color:'rgba(255,255,255,.5)', marginTop:3 }}>{sub}</div>}
+  </div>
+);
+const Arrow = () => <div style={{ textAlign:'center', color:'rgba(255,255,255,.3)', fontSize:18, lineHeight:1.2, margin:'4px 0' }}>↓</div>;
+const Split = ({left,right}) => (
+  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, margin:'4px 0' }}>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+      <div style={{ fontSize:10, color:C.green, fontWeight:700 }}>OPEN</div>
+      {left}
+    </div>
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
+      <div style={{ fontSize:10, color:C.amber, fontWeight:700 }}>CLOSED</div>
+      {right}
+    </div>
+  </div>
+);
+
 const Phase4 = ({ d, u }) => {
   const notReq = d.q2req === false;
   const hasPhones = (d.phoneDevices||[]).length > 0;
+  const phoneDevices = d.phoneDevices||[];
+  const updPhone = (idx, field, val) => { const arr = phoneDevices.map((x,i)=>i===idx?{...x,[field]:val}:x); u('phoneDevices', arr); };
+  const removePhone = idx => u('phoneDevices', phoneDevices.filter((_,i)=>i!==idx));
+  const addPhone = () => u('phoneDevices', [...phoneDevices, {id:uid(),deviceType:'',model:'',modelOther:'',location:'',extension:'',displayName:'',mac:'',existing:false}]);
+  const DESK_MODELS = ['T53W','T54W','T73U','T87W','Other'];
+  const HEADSET_MODELS_LIST = ['WH64 Wireless DECT','Other'];
+  const CORDLESS_MODELS_LIST = ['W76P','Other'];
+  const modelOptions = (type) => type==='Desk' ? DESK_MODELS : type==='Headset' ? HEADSET_MODELS_LIST : type==='Cordless' ? CORDLESS_MODELS_LIST : [];
 
   return (
     <div>
@@ -1943,27 +1972,7 @@ const Phase4 = ({ d, u }) => {
               {(d.callFlowType||'default')==='default' ? 'Default Call Flow' : 'Custom Call Flow'}
             </div>
             {/* Node helper */}
-            {(() => {
-              const Node = ({icon,label,sub,color='#1E3869'}) => (
-                <div style={{ background:color, border:`1.5px solid rgba(255,255,255,.15)`, borderRadius:9, padding:'10px 14px', textAlign:'center', minWidth:140 }}>
-                  <div style={{ fontSize:18, marginBottom:4 }}>{icon}</div>
-                  <div style={{ fontSize:12, fontWeight:700, color:C.white, lineHeight:1.3 }}>{label}</div>
-                  {sub&&<div style={{ fontSize:10, color:'rgba(255,255,255,.5)', marginTop:3 }}>{sub}</div>}
-                </div>
-              );
-              const Arrow = () => <div style={{ textAlign:'center', color:'rgba(255,255,255,.3)', fontSize:18, lineHeight:1.2, margin:'4px 0' }}>↓</div>;
-              const Split = ({left,right}) => (
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, margin:'4px 0' }}>
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-                    <div style={{ fontSize:10, color:C.green, fontWeight:700 }}>OPEN</div>
-                    {left}
-                  </div>
-                  <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
-                    <div style={{ fontSize:10, color:C.amber, fontWeight:700 }}>CLOSED</div>
-                    {right}
-                  </div>
-                </div>
-              );
+            {(()=>{
               if((d.callFlowType||'default')==='default') return (
                 <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:4 }}>
                   <Node icon="📞" label="Incoming Call" />
@@ -2040,23 +2049,8 @@ const Phase4 = ({ d, u }) => {
       )}
 
       <Divider label="Phone Devices" />
-      {(()=>{
-        const devices = d.phoneDevices||[];
-        const upd = (idx, field, val) => {
-          const arr = devices.map((x,i)=>i===idx?{...x,[field]:val}:x);
-          u('phoneDevices', arr);
-        };
-        const remove = idx => u('phoneDevices', devices.filter((_,i)=>i!==idx));
-        const add = () => u('phoneDevices', [...devices, {id:uid(),deviceType:'',model:'',modelOther:'',location:'',extension:'',displayName:'',mac:'',existing:false}]);
-
-        const DESK_MODELS   = ['T53W','T54W','T73U','T87W','Other'];
-        const HEADSET_MODELS_LIST = ['WH64 Wireless DECT','Other'];
-        const CORDLESS_MODELS_LIST = ['W76P','Other'];
-        const modelOptions = (type) => type==='Desk' ? DESK_MODELS : type==='Headset' ? HEADSET_MODELS_LIST : type==='Cordless' ? CORDLESS_MODELS_LIST : [];
-
-        return (
-          <>
-            {devices.map((dev,i)=>{
+      <>
+            {phoneDevices.map((dev,i)=>{
               const opts = modelOptions(dev.deviceType);
               const isOther = dev.model==='Other';
               const typeLabel = dev.deviceType||(dev.modelOther||dev.model||'Device');
@@ -2066,45 +2060,45 @@ const Phase4 = ({ d, u }) => {
                     <div style={{fontFamily:'Sora,sans-serif',fontWeight:700,fontSize:13,color:C.textPrimary}}>
                       Device {i+1}{dev.deviceType?` — ${dev.deviceType}`:''}{(dev.model&&!isOther)?`: ${dev.model}`:''}
                     </div>
-                    <button onClick={()=>remove(i)} style={{color:C.red,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:700}}>Remove</button>
+                    <button onClick={()=>removePhone(i)} style={{color:C.red,background:'none',border:'none',cursor:'pointer',fontSize:12,fontWeight:700}}>Remove</button>
                   </div>
                   <Row>
                     <Field label="Device Type" tight>
-                      <Select value={dev.deviceType||''} onChange={v=>upd(i,'deviceType',v)} placeholder="Select type…" options={['Desk','Cordless','Headset']} />
+                      <Select value={dev.deviceType||''} onChange={v=>updPhone(i,'deviceType',v)} placeholder="Select type…" options={['Desk','Cordless','Headset']} />
                     </Field>
                     <Field label="Device Model" tight>
                       {dev.deviceType ? (
                         isOther
-                          ? <Input value={dev.modelOther||''} onChange={v=>upd(i,'modelOther',v)} placeholder="Enter model…" />
-                          : <Select value={dev.model||''} onChange={v=>upd(i,'model',v)} placeholder="Select model…" options={opts} />
+                          ? <Input value={dev.modelOther||''} onChange={v=>updPhone(i,'modelOther',v)} placeholder="Enter model…" />
+                          : <Select value={dev.model||''} onChange={v=>updPhone(i,'model',v)} placeholder="Select model…" options={opts} />
                       ) : <Input value='' onChange={()=>{}} placeholder="Select type first" disabled />}
                     </Field>
                   </Row>
                   <Row>
                     <Field label="Location" tight>
-                      <Input value={dev.location||''} onChange={v=>upd(i,'location',v)} placeholder="e.g. Reception, Surgery 1" />
+                      <Input value={dev.location||''} onChange={v=>updPhone(i,'location',v)} placeholder="e.g. Reception, Surgery 1" />
                     </Field>
                     {dev.deviceType!=='Headset' && (
                       <Field label="Extension Number" tight>
-                        <Input value={dev.extension||''} onChange={v=>upd(i,'extension',v)} placeholder="e.g. 101" />
+                        <Input value={dev.extension||''} onChange={v=>updPhone(i,'extension',v)} placeholder="e.g. 101" />
                       </Field>
                     )}
                   </Row>
                   {dev.deviceType!=='Headset' && (
                     <Row>
                       <Field label="User / Display Name" tight>
-                        <Input value={dev.displayName||''} onChange={v=>upd(i,'displayName',v)} placeholder="e.g. Reception, Dr Smith" />
+                        <Input value={dev.displayName||''} onChange={v=>updPhone(i,'displayName',v)} placeholder="e.g. Reception, Dr Smith" />
                       </Field>
                       <Field label="MAC Address" tight>
-                        <Input value={dev.mac||''} onChange={v=>upd(i,'mac',v)} placeholder="e.g. 00:1A:2B:3C:4D:5E" />
+                        <Input value={dev.mac||''} onChange={v=>updPhone(i,'mac',v)} placeholder="e.g. 00:1A:2B:3C:4D:5E" />
                       </Field>
                     </Row>
                   )}
-                  <Toggle checked={!!dev.existing} onChange={v=>upd(i,'existing',v)} label="Existing device (already on-site)" />
+                  <Toggle checked={!!dev.existing} onChange={v=>updPhone(i,'existing',v)} label="Existing device (already on-site)" />
                 </div>
               );
             })}
-            <button onClick={add} style={{width:'100%',padding:'10px',borderRadius:9,border:`2px dashed ${C.border}`,background:'transparent',color:C.orange,fontWeight:700,fontSize:13,cursor:'pointer',marginBottom:12}}>
+            <button onClick={addPhone} style={{width:'100%',padding:'10px',borderRadius:9,border:`2px dashed ${C.border}`,background:'transparent',color:C.orange,fontWeight:700,fontSize:13,cursor:'pointer',marginBottom:12}}>
               + Add Phone Device
             </button>
             {devices.length>0&&(
@@ -2112,9 +2106,7 @@ const Phase4 = ({ d, u }) => {
                 Phone / headset setup: 2 hrs base + 15 min per handset beyond 4 — included in professional services
               </div>
             )}
-          </>
-        );
-      })()}
+      </>
 
       <Divider label="Notes" />
       <Textarea value={d.telecomNotes||''} onChange={v=>u('telecomNotes',v)} placeholder="Existing provider, contract expiry, number porting details, building NBN status…" />
@@ -2126,6 +2118,74 @@ const Phase4 = ({ d, u }) => {
 const Phase5 = ({ d, u, rooms }) => {
   const autoEP = (rooms||[]).reduce((a,r)=>a+n(r.qty),0);
   const notReq = d.q3req === false;
+const hasBCDR  = (d.backupDevices||[]).some(b=>b.backupType&&b.backupType.includes('BCDR'));
+const hasCloud = (d.backupDevices||[]).some(b=>b.backupType==='Cloud Backup Only');
+const hasMSA   = d.msaSelected!==false;
+
+// States: Green=MSA+BCDR+AdvCyber, A3=MSA+BCDR, A2=MSA+Cloud, A1=MSA only, Red=nothing
+const isGreen  = d.advancedCyber && hasMSA && hasBCDR;
+const isAmber3 = !isGreen && hasMSA && hasBCDR;
+const isAmber2b= !isGreen && !isAmber3 && d.advancedCyber && hasMSA && !hasBCDR;
+const isAmber2 = !isGreen && !isAmber3 && !isAmber2b && hasMSA && hasCloud;
+const isAmber1 = !isGreen && !isAmber3 && !isAmber2b && !isAmber2 && hasMSA;
+
+// ── Exact figures per state ──
+const STATE = isGreen ? {
+  score:5, label:'LOW', ptsText:'↓ 95 pts from controls',
+  downtime:'$3,150 – $8,820', itRecovery:'$750 – $3,750', fines:'$0 – $0', patientLoss:'$16,200 – $43,200',
+  total:'$20,100 – $55,770', totalMax:55770,
+  callout:'Your selected controls reduce breach likelihood from 100 to 5/100, lowering estimated exposure by up to $447,050.',
+  costRange:'$48k–$135k', reduction:'↓ $447k reduction',
+} : isAmber3 ? {
+  score:36, label:'MEDIUM', ptsText:'↓ 64 pts from controls',
+  downtime:'$3,150 – $8,820', itRecovery:'$2,250 – $9,000', fines:'$5,000 – $20,000', patientLoss:'$43,200 – $115,200',
+  total:'$53,600 – $153,020', totalMax:153020,
+  callout:'Your selected controls reduce breach likelihood from 100 to 36/100, lowering estimated exposure by up to $349,800.',
+  costRange:'$82k–$232k', reduction:'↓ $350k so far',
+} : isAmber2b ? {
+  score:39, label:'MEDIUM', ptsText:'↓ 61 pts from controls',
+  downtime:'$31,500 – $88,200', itRecovery:'$2,250 – $9,000', fines:'$5,000 – $20,000', patientLoss:'$43,200 – $115,200',
+  total:'$66,200 – $188,300', totalMax:188300,
+  callout:'Your selected controls reduce breach likelihood from 100 to 39/100, lowering estimated exposure by up to $349,800.',
+  costRange:'$82k–$232k', reduction:'↓ $350k so far',
+} : isAmber2 ? {
+  score:60, label:'MEDIUM', ptsText:'↓ 40 pts from controls',
+  downtime:'$15,750 – $44,100', itRecovery:'$2,250 – $9,000', fines:'$5,000 – $20,000', patientLoss:'$43,200 – $115,200',
+  total:'$81,950 – $232,400', totalMax:232400,
+  callout:'Your selected controls reduce breach likelihood from 100 to 60/100, lowering estimated exposure by up to $349,800.',
+  costRange:'$82k–$232k', reduction:'↓ $350k so far',
+} : isAmber1 ? {
+  score:70, label:'HIGH', ptsText:'↓ 30 pts from controls',
+  downtime:'$31,500 – $88,200', itRecovery:'$6,000 – $21,000', fines:'$5,000 – $20,000', patientLoss:'$97,200 – $259,200',
+  total:'$139,700 – $388,400', totalMax:388400,
+  callout:'Your selected controls reduce breach likelihood from 100 to 70/100, lowering estimated exposure by up to $193,800.',
+  costRange:'$140k–$388k', reduction:'↓ $194k so far',
+} : {
+  score:100, label:'CRITICAL', ptsText:null,
+  downtime:'$31,500 – $88,200', itRecovery:'$12,000 – $42,000', fines:'$5,000 – $20,000', patientLoss:'$162,000 – $432,000',
+  total:'$210,500 – $582,200', totalMax:582200,
+  callout:null,
+  costRange:'$211k–$582k', reduction:null,
+};
+
+const mainCol   = isGreen?'#10B981' : (isAmber3||isAmber2b||isAmber2)?'#F59E0B' : isAmber1?'#F97316' : '#EF4444';
+const bgGrad    = isGreen?'linear-gradient(135deg,#0A1A12 0%,#0D2318 100%)' : (isAmber3||isAmber2b||isAmber2||isAmber1)?'linear-gradient(135deg,#1A1400 0%,#2A1F00 100%)':'linear-gradient(135deg,#1A0A0A 0%,#2D1515 100%)';
+const borderCol = isGreen?'rgba(16,185,129,.5)' : (isAmber3||isAmber2b||isAmber2)?'rgba(245,158,11,.5)' : isAmber1?'rgba(249,115,22,.5)' : 'rgba(239,68,68,.5)';
+const tileBg    = isGreen?'rgba(16,185,129,.08)':'rgba('+(isAmber3||isAmber2b||isAmber2?'245,158,11':isAmber1?'249,115,22':'239,68,68')+',.06)';
+const tileBdr   = isGreen?'rgba(16,185,129,.2)':'rgba('+(isAmber3||isAmber2b||isAmber2?'245,158,11':isAmber1?'249,115,22':'239,68,68')+',.2)';
+
+const headerText = isGreen?'✓ Cyber Risk with all controls active'
+  : isAmber3?'⚡ MSA + BCDR active — Advanced Cyber not selected'
+  : isAmber2b?'⚡ MSA + Advanced Cyber active — no backup selected'
+  : isAmber2?'⚡ MSA + Cloud Backup active — BCDR & Advanced Cyber not selected'
+  : isAmber1?'⚡ MSA active — no backup or Advanced Cyber selected'
+  : '⚠️ No controls — baseline worst-case risk';
+const subText = isGreen?'MSA + Advanced Cyber + BCDR fully activated'
+  : isAmber3?'MSA + BCDR active · No SOC · No PAM · No Dark Web monitoring'
+  : isAmber2b?'MSA + Advanced Cyber active · No BCDR or Cloud Backup'
+  : isAmber2?'MSA + Cloud Backup active · No BCDR · No SOC · No PAM'
+  : isAmber1?'MSA active · No backup · No SOC · No PAM'
+  : 'Antivirus only · No SOC · No BCDR · No patching · No PAM';
   return (
     <div>
       <PhaseHeader num={5} title="Managed Services" sub="The ongoing monthly investment — Quote 3. Scales as the practice grows." />
@@ -2348,162 +2408,89 @@ const Phase5 = ({ d, u, rooms }) => {
         </button>
       </div>
       {/* Advanced Cyber value prop — breach risk */}
-      {(()=>{
-        const hasBCDR  = (d.backupDevices||[]).some(b=>b.backupType&&b.backupType.includes('BCDR'));
-        const hasCloud = (d.backupDevices||[]).some(b=>b.backupType==='Cloud Backup Only');
-        const hasMSA   = d.msaSelected!==false;
+  <div style={{background:bgGrad,borderRadius:11,padding:'16px',marginBottom:8,border:`2px solid ${borderCol}`}}>
+    {/* Header */}
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
+      <div>
+        <div style={{fontSize:11,fontWeight:700,color:mainCol,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:4}}>{headerText}</div>
+        <div style={{fontSize:12,color:'rgba(255,255,255,.5)'}}>{subText}</div>
+      </div>
+      <div style={{textAlign:'right'}}>
+        <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:2}}>Worst-case exposure</div>
+        {isGreen
+          ? <><div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'rgba(239,68,68,.45)',textDecoration:'line-through',lineHeight:1.1}}>{`$${(582200).toLocaleString()}`}</div><div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:18,color:'#10B981',lineHeight:1.2}}>{`$${STATE.totalMax.toLocaleString()}`}</div><div style={{fontSize:10,color:'rgba(16,185,129,.6)',marginTop:2}}>with full controls active</div></>
+          : STATE.score<100
+            ? <><div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'rgba(239,68,68,.45)',textDecoration:'line-through',lineHeight:1.1}}>{`$${(582200).toLocaleString()}`}</div><div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:18,color:mainCol,lineHeight:1.2}}>{`$${STATE.totalMax.toLocaleString()}`}</div><div style={{fontSize:10,color:`${mainCol}99`,marginTop:2}}>{`add more controls → $${(55770).toLocaleString()}`}</div></>
+            : <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'rgba(239,68,68,.85)',lineHeight:1.1}}>{`$${STATE.totalMax.toLocaleString()}`}</div>
+        }
+        <div style={{fontSize:10,color:'rgba(255,255,255,.4)',marginTop:2}}>ASD & ICA Australia 2024–25</div>
+      </div>
+    </div>
 
-        // States: Green=MSA+BCDR+AdvCyber, A3=MSA+BCDR, A2=MSA+Cloud, A1=MSA only, Red=nothing
-        const isGreen  = d.advancedCyber && hasMSA && hasBCDR;
-        const isAmber3 = !isGreen && hasMSA && hasBCDR;
-        const isAmber2b= !isGreen && !isAmber3 && d.advancedCyber && hasMSA && !hasBCDR;
-        const isAmber2 = !isGreen && !isAmber3 && !isAmber2b && hasMSA && hasCloud;
-        const isAmber1 = !isGreen && !isAmber3 && !isAmber2b && !isAmber2 && hasMSA;
+    {/* Score + pts */}
+    <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:12}}>
+      <span style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:36,color:mainCol,lineHeight:1}}>{STATE.score}</span>
+      <span style={{fontSize:14,color:'rgba(255,255,255,.5)'}}>/100 breach likelihood</span>
+      <span style={{display:'inline-block',background:`${mainCol}33`,color:mainCol,fontSize:11,fontWeight:700,padding:'2px 10px',borderRadius:12}}>{STATE.label}</span>
+      {STATE.ptsText && <span style={{fontSize:12,color:'rgba(255,255,255,.5)'}}>↓ {100-STATE.score} pts from controls</span>}
+    </div>
 
-        // ── Exact figures per state ──
-        const STATE = isGreen ? {
-          score:5, label:'LOW', ptsText:'↓ 95 pts from controls',
-          downtime:'$3,150 – $8,820', itRecovery:'$750 – $3,750', fines:'$0 – $0', patientLoss:'$16,200 – $43,200',
-          total:'$20,100 – $55,770', totalMax:55770,
-          callout:'Your selected controls reduce breach likelihood from 100 to 5/100, lowering estimated exposure by up to $447,050.',
-          costRange:'$48k–$135k', reduction:'↓ $447k reduction',
-        } : isAmber3 ? {
-          score:36, label:'MEDIUM', ptsText:'↓ 64 pts from controls',
-          downtime:'$3,150 – $8,820', itRecovery:'$2,250 – $9,000', fines:'$5,000 – $20,000', patientLoss:'$43,200 – $115,200',
-          total:'$53,600 – $153,020', totalMax:153020,
-          callout:'Your selected controls reduce breach likelihood from 100 to 36/100, lowering estimated exposure by up to $349,800.',
-          costRange:'$82k–$232k', reduction:'↓ $350k so far',
-        } : isAmber2b ? {
-          score:39, label:'MEDIUM', ptsText:'↓ 61 pts from controls',
-          downtime:'$31,500 – $88,200', itRecovery:'$2,250 – $9,000', fines:'$5,000 – $20,000', patientLoss:'$43,200 – $115,200',
-          total:'$66,200 – $188,300', totalMax:188300,
-          callout:'Your selected controls reduce breach likelihood from 100 to 39/100, lowering estimated exposure by up to $349,800.',
-          costRange:'$82k–$232k', reduction:'↓ $350k so far',
-        } : isAmber2 ? {
-          score:60, label:'MEDIUM', ptsText:'↓ 40 pts from controls',
-          downtime:'$15,750 – $44,100', itRecovery:'$2,250 – $9,000', fines:'$5,000 – $20,000', patientLoss:'$43,200 – $115,200',
-          total:'$81,950 – $232,400', totalMax:232400,
-          callout:'Your selected controls reduce breach likelihood from 100 to 60/100, lowering estimated exposure by up to $349,800.',
-          costRange:'$82k–$232k', reduction:'↓ $350k so far',
-        } : isAmber1 ? {
-          score:70, label:'HIGH', ptsText:'↓ 30 pts from controls',
-          downtime:'$31,500 – $88,200', itRecovery:'$6,000 – $21,000', fines:'$5,000 – $20,000', patientLoss:'$97,200 – $259,200',
-          total:'$139,700 – $388,400', totalMax:388400,
-          callout:'Your selected controls reduce breach likelihood from 100 to 70/100, lowering estimated exposure by up to $193,800.',
-          costRange:'$140k–$388k', reduction:'↓ $194k so far',
-        } : {
-          score:100, label:'CRITICAL', ptsText:null,
-          downtime:'$31,500 – $88,200', itRecovery:'$12,000 – $42,000', fines:'$5,000 – $20,000', patientLoss:'$162,000 – $432,000',
-          total:'$210,500 – $582,200', totalMax:582200,
-          callout:null,
-          costRange:'$211k–$582k', reduction:null,
-        };
-
-        const mainCol   = isGreen?'#10B981' : (isAmber3||isAmber2b||isAmber2)?'#F59E0B' : isAmber1?'#F97316' : '#EF4444';
-        const bgGrad    = isGreen?'linear-gradient(135deg,#0A1A12 0%,#0D2318 100%)' : (isAmber3||isAmber2b||isAmber2||isAmber1)?'linear-gradient(135deg,#1A1400 0%,#2A1F00 100%)':'linear-gradient(135deg,#1A0A0A 0%,#2D1515 100%)';
-        const borderCol = isGreen?'rgba(16,185,129,.5)' : (isAmber3||isAmber2b||isAmber2)?'rgba(245,158,11,.5)' : isAmber1?'rgba(249,115,22,.5)' : 'rgba(239,68,68,.5)';
-        const tileBg    = isGreen?'rgba(16,185,129,.08)':'rgba('+(isAmber3||isAmber2b||isAmber2?'245,158,11':isAmber1?'249,115,22':'239,68,68')+',.06)';
-        const tileBdr   = isGreen?'rgba(16,185,129,.2)':'rgba('+(isAmber3||isAmber2b||isAmber2?'245,158,11':isAmber1?'249,115,22':'239,68,68')+',.2)';
-
-        const headerText = isGreen?'✓ Cyber Risk with all controls active'
-          : isAmber3?'⚡ MSA + BCDR active — Advanced Cyber not selected'
-          : isAmber2b?'⚡ MSA + Advanced Cyber active — no backup selected'
-          : isAmber2?'⚡ MSA + Cloud Backup active — BCDR & Advanced Cyber not selected'
-          : isAmber1?'⚡ MSA active — no backup or Advanced Cyber selected'
-          : '⚠️ No controls — baseline worst-case risk';
-        const subText = isGreen?'MSA + Advanced Cyber + BCDR fully activated'
-          : isAmber3?'MSA + BCDR active · No SOC · No PAM · No Dark Web monitoring'
-          : isAmber2b?'MSA + Advanced Cyber active · No BCDR or Cloud Backup'
-          : isAmber2?'MSA + Cloud Backup active · No BCDR · No SOC · No PAM'
-          : isAmber1?'MSA active · No backup · No SOC · No PAM'
-          : 'Antivirus only · No SOC · No BCDR · No patching · No PAM';
-
-        return (
-          <div style={{background:bgGrad,borderRadius:11,padding:'16px',marginBottom:8,border:`2px solid ${borderCol}`}}>
-            {/* Header */}
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:14}}>
-              <div>
-                <div style={{fontSize:11,fontWeight:700,color:mainCol,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:4}}>{headerText}</div>
-                <div style={{fontSize:12,color:'rgba(255,255,255,.5)'}}>{subText}</div>
-              </div>
-              <div style={{textAlign:'right'}}>
-                <div style={{fontSize:10,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:2}}>Worst-case exposure</div>
-                {isGreen
-                  ? <><div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'rgba(239,68,68,.45)',textDecoration:'line-through',lineHeight:1.1}}>{`$${(582200).toLocaleString()}`}</div><div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:18,color:'#10B981',lineHeight:1.2}}>{`$${STATE.totalMax.toLocaleString()}`}</div><div style={{fontSize:10,color:'rgba(16,185,129,.6)',marginTop:2}}>with full controls active</div></>
-                  : STATE.score<100
-                    ? <><div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'rgba(239,68,68,.45)',textDecoration:'line-through',lineHeight:1.1}}>{`$${(582200).toLocaleString()}`}</div><div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:18,color:mainCol,lineHeight:1.2}}>{`$${STATE.totalMax.toLocaleString()}`}</div><div style={{fontSize:10,color:`${mainCol}99`,marginTop:2}}>{`add more controls → $${(55770).toLocaleString()}`}</div></>
-                    : <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:20,color:'rgba(239,68,68,.85)',lineHeight:1.1}}>{`$${STATE.totalMax.toLocaleString()}`}</div>
-                }
-                <div style={{fontSize:10,color:'rgba(255,255,255,.4)',marginTop:2}}>ASD & ICA Australia 2024–25</div>
-              </div>
-            </div>
-
-            {/* Score + pts */}
-            <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:12}}>
-              <span style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:36,color:mainCol,lineHeight:1}}>{STATE.score}</span>
-              <span style={{fontSize:14,color:'rgba(255,255,255,.5)'}}>/100 breach likelihood</span>
-              <span style={{display:'inline-block',background:`${mainCol}33`,color:mainCol,fontSize:11,fontWeight:700,padding:'2px 10px',borderRadius:12}}>{STATE.label}</span>
-              {STATE.ptsText && <span style={{fontSize:12,color:'rgba(255,255,255,.5)'}}>↓ {100-STATE.score} pts from controls</span>}
-            </div>
-
-            {/* Financial + Regulatory split */}
-            <div style={{marginBottom:12}}>
-              {/* Financial exposure */}
-              <div style={{background:'rgba(0,0,0,.2)',borderRadius:8,padding:'12px 14px',border:`1px solid ${tileBdr}`}}>
-                <div style={{fontSize:10,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:8}}>Estimated Financial Exposure</div>
-                {[
-                  ['⏱ Downtime', STATE.downtime],
-                  ['💻 IT recovery', STATE.itRecovery],
-                  ['⚖️ Fines', STATE.fines],
-                  ['👤 Patient loss', STATE.patientLoss],
-                ].map(([label, val])=>(
-                  <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,.06)',fontSize:12}}>
-                    <span style={{color:'rgba(255,255,255,.5)'}}>{label}</span>
-                    <span style={{color:'rgba(255,255,255,.8)',fontWeight:500}}>{val}</span>
-                  </div>
-                ))}
-                <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',marginTop:2,fontSize:13}}>
-                  <span style={{fontWeight:700,color:mainCol}}>Total exposure</span>
-                  <span style={{fontWeight:700,color:mainCol}}>{STATE.total}</span>
-                </div>
-              </div>
-            </div>
-            {STATE.callout && (
-              <div style={{background:`${mainCol}0D`,borderRadius:8,padding:'10px 12px',border:`1px solid ${mainCol}33`,marginBottom:12}}>
-                <div style={{fontSize:10,fontWeight:700,color:mainCol,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4}}>With your controls</div>
-                <div style={{fontSize:12,color:'rgba(255,255,255,.6)',lineHeight:1.5}}>{STATE.callout}</div>
-              </div>
-            )}
-
-            {/* Control badges */}
-            <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginBottom:6}}>{isGreen?'Controls active:':'Controls active / missing:'}</div>
-            <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10}}>
-              {isGreen
-                ? [['MSA — EDR + Patching','−30'],['Managed SOC','−14'],['PAM','−8'],['Password Manager','−5'],['Dark Web Monitor','−4'],['BCDR','−24']].map(([l,v])=>(
-                    <div key={l} style={{fontSize:11,fontWeight:600,color:'#10B981',background:'rgba(16,185,129,.1)',borderRadius:6,padding:'2px 8px',border:'1px solid rgba(16,185,129,.2)'}}>✓ {l} {v} pts</div>
-                  ))
-                : [
-                    hasMSA&&{l:'✓ MSA',v:'−30 pts',ok:true},
-                    d.advancedCyber&&{l:'✓ Managed SOC',v:'−14 pts',ok:true},
-                    d.advancedCyber&&{l:'✓ PAM',v:'−8 pts',ok:true},
-                    d.advancedCyber&&{l:'✓ Password Mgr',v:'−5 pts',ok:true},
-                    d.advancedCyber&&{l:'✓ Dark Web',v:'−4 pts',ok:true},
-                    hasBCDR&&{l:'✓ BCDR',v:'−24 pts',ok:true},
-                    hasCloud&&!hasBCDR&&{l:'✓ Cloud Backup',v:'−10 pts',ok:true},
-                    !hasBCDR&&{l:'✗ No BCDR',v:'+15 pts',ok:false},
-                    !d.advancedCyber&&{l:'✗ No SOC',v:'+30 pts',ok:false},
-                    !d.advancedCyber&&{l:'✗ No PAM',v:'+16 pts',ok:false},
-                    !hasMSA&&{l:'✗ No MSA/Patching',v:'+20 pts',ok:false},
-                  ].filter(Boolean).map(({l,v,ok})=>(
-                    <div key={l} style={{fontSize:11,fontWeight:600,color:ok?'#10B981':'#FCA5A5',background:ok?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)',borderRadius:6,padding:'2px 8px',border:`1px solid ${ok?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'}`}}>{l} {v}</div>
-                  ))
-              }
-            </div>
-
-            <div style={{fontSize:11,color:'rgba(255,255,255,.25)'}}>ⓘ NDB Scheme: Once aware of a breach, you must notify the OAIC and all affected patients as soon as practicable. Source: ASD & ICA Australia 2024–25.</div>
+    {/* Financial + Regulatory split */}
+    <div style={{marginBottom:12}}>
+      {/* Financial exposure */}
+      <div style={{background:'rgba(0,0,0,.2)',borderRadius:8,padding:'12px 14px',border:`1px solid ${tileBdr}`}}>
+        <div style={{fontSize:10,fontWeight:700,color:'rgba(255,255,255,.4)',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:8}}>Estimated Financial Exposure</div>
+        {[
+          ['⏱ Downtime', STATE.downtime],
+          ['💻 IT recovery', STATE.itRecovery],
+          ['⚖️ Fines', STATE.fines],
+          ['👤 Patient loss', STATE.patientLoss],
+        ].map(([label, val])=>(
+          <div key={label} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'1px solid rgba(255,255,255,.06)',fontSize:12}}>
+            <span style={{color:'rgba(255,255,255,.5)'}}>{label}</span>
+            <span style={{color:'rgba(255,255,255,.8)',fontWeight:500}}>{val}</span>
           </div>
-        );
-      })()}
+        ))}
+        <div style={{display:'flex',justifyContent:'space-between',padding:'6px 0',marginTop:2,fontSize:13}}>
+          <span style={{fontWeight:700,color:mainCol}}>Total exposure</span>
+          <span style={{fontWeight:700,color:mainCol}}>{STATE.total}</span>
+        </div>
+      </div>
+    </div>
+    {STATE.callout && (
+      <div style={{background:`${mainCol}0D`,borderRadius:8,padding:'10px 12px',border:`1px solid ${mainCol}33`,marginBottom:12}}>
+        <div style={{fontSize:10,fontWeight:700,color:mainCol,textTransform:'uppercase',letterSpacing:'.07em',marginBottom:4}}>With your controls</div>
+        <div style={{fontSize:12,color:'rgba(255,255,255,.6)',lineHeight:1.5}}>{STATE.callout}</div>
+      </div>
+    )}
+
+    {/* Control badges */}
+    <div style={{fontSize:11,color:'rgba(255,255,255,.4)',marginBottom:6}}>{isGreen?'Controls active:':'Controls active / missing:'}</div>
+    <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10}}>
+      {isGreen
+        ? [['MSA — EDR + Patching','−30'],['Managed SOC','−14'],['PAM','−8'],['Password Manager','−5'],['Dark Web Monitor','−4'],['BCDR','−24']].map(([l,v])=>(
+            <div key={l} style={{fontSize:11,fontWeight:600,color:'#10B981',background:'rgba(16,185,129,.1)',borderRadius:6,padding:'2px 8px',border:'1px solid rgba(16,185,129,.2)'}}>✓ {l} {v} pts</div>
+          ))
+        : [
+            hasMSA&&{l:'✓ MSA',v:'−30 pts',ok:true},
+            d.advancedCyber&&{l:'✓ Managed SOC',v:'−14 pts',ok:true},
+            d.advancedCyber&&{l:'✓ PAM',v:'−8 pts',ok:true},
+            d.advancedCyber&&{l:'✓ Password Mgr',v:'−5 pts',ok:true},
+            d.advancedCyber&&{l:'✓ Dark Web',v:'−4 pts',ok:true},
+            hasBCDR&&{l:'✓ BCDR',v:'−24 pts',ok:true},
+            hasCloud&&!hasBCDR&&{l:'✓ Cloud Backup',v:'−10 pts',ok:true},
+            !hasBCDR&&{l:'✗ No BCDR',v:'+15 pts',ok:false},
+            !d.advancedCyber&&{l:'✗ No SOC',v:'+30 pts',ok:false},
+            !d.advancedCyber&&{l:'✗ No PAM',v:'+16 pts',ok:false},
+            !hasMSA&&{l:'✗ No MSA/Patching',v:'+20 pts',ok:false},
+          ].filter(Boolean).map(({l,v,ok})=>(
+            <div key={l} style={{fontSize:11,fontWeight:600,color:ok?'#10B981':'#FCA5A5',background:ok?'rgba(16,185,129,.1)':'rgba(239,68,68,.1)',borderRadius:6,padding:'2px 8px',border:`1px solid ${ok?'rgba(16,185,129,.2)':'rgba(239,68,68,.2)'}`}}>{l} {v}</div>
+          ))
+      }
+    </div>
+
+    <div style={{fontSize:11,color:'rgba(255,255,255,.25)'}}>ⓘ NDB Scheme: Once aware of a breach, you must notify the OAIC and all affected patients as soon as practicable. Source: ASD & ICA Australia 2024–25.</div>
+  </div>
       <Divider label="Cyber Liability Insurance" />
       <InfoBox>Capture the practice's existing cyber insurance details — important context for our Advanced Cyber Security recommendations.</InfoBox>
       <Row>
