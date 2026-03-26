@@ -750,6 +750,7 @@ const Phase3 = ({ d, u }) => {
   const [importCompany, setImportCompany] = useState('');
   const [importAllRows, setImportAllRows] = useState([]);
   const [importSearch, setImportSearch] = useState('');
+  const [deviceFilter, setDeviceFilter] = useState('All');
 
   const addR  = () => u('rooms',[...rooms,{ id:uid(), name:'', deviceType:'practice', qty:1, monitor:'No Monitor', kbMouse:false, database:false, notes:'', existingPC:false, pcAge:'', pcBrand:'', pcCondition:'Functional', pcNotes:'', pcSerial:'', pcCategory:'' }]);
   const updR  = (id,k,v) => u('rooms', rooms.map(x=>x.id===id?{...x,[k]:v}:x));
@@ -1017,7 +1018,6 @@ const Phase3 = ({ d, u }) => {
           if(r.deviceType&&(r.deviceType.includes('laptop')||r.deviceType.includes('il-'))) return 'Laptop';
           return 'Desktop';
         };
-        const [deviceFilter, setDeviceFilter] = React.useState('All');
         const filters = ['All','Desktop','Laptop','Server'];
         const filtered = rooms.filter(r => deviceFilter==='All' || getCategory(r)===deviceFilter);
         return (<>
